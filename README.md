@@ -99,3 +99,5 @@ The repository declares `engines.node` as `>=24.0.0 <25.0.0`, includes `.nvmrc`,
 The attached evidence-governance specification is captured in the [AI Threat Observatory reasoning contract](docs/AI-THREAT-OBSERVATORY-REASONING.md) and its [machine-readable v1 policy](contracts/observatory-reasoning.v1.json). This is a defensive policy and provenance boundary; it does not enable live malware execution, external retaliation, or autonomous legal/actor attribution.
 
 See [UPSTREAM-CREDITS.md](UPSTREAM-CREDITS.md) for the professional upstream attribution index, creator links, license-preservation requirements, and the distinction between reference material and incorporated code.
+
+See [AUDIT-REPORT.md](AUDIT-REPORT.md) for the adversarial syntax, runtime, deployment, EDR, evidence, encryption, failure-mode, and security-boundary assessment. The report deliberately distinguishes demonstrated capabilities from partial and untested components.
