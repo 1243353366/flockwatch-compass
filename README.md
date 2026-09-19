@@ -84,6 +84,16 @@ PORT=8787 node selfhost.mjs
 
 When D1 and the key are both present, proof records and proof claims are stored as **AES-256-GCM** ciphertext. The key is never returned by `/health` or sent to the browser. Without the key, proof persistence fails closed rather than writing plaintext.
 
+### Python fast path
+
+For the smallest and quickest local deployment, Python 3.10+ provides a standard-library-only API fallback:
+
+```sh
+PORT=8788 python3 selfhost/python_server.py
+```
+
+It exposes `/health`, `/api/analyze`, and `/api/observatory/proof`, with the same uncertainty and no-external-execution boundary. It is intentionally stateless and does not replace the Node/Workers AI + D1 runtime. Ada and Go adapters are not included in this release because their toolchains are not part of the supported environment and an unverified duplicate runtime would increase control-plane complexity.
+
 The repository declares `engines.node` as `>=24.0.0 <25.0.0`, includes `.nvmrc`, and pins Wrangler in `package-lock.json`. There is no Dockerfile in this repository; no Docker runtime change was necessary.
 
 The attached evidence-governance specification is captured in the [AI Threat Observatory reasoning contract](docs/AI-THREAT-OBSERVATORY-REASONING.md) and its [machine-readable v1 policy](contracts/observatory-reasoning.v1.json). This is a defensive policy and provenance boundary; it does not enable live malware execution, external retaliation, or autonomous legal/actor attribution.

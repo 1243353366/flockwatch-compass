@@ -1,3 +1,5 @@
 node_modules/
 .wrangler/
 .wrangler-dry-run/
+__pycache__/
+*.pyc
