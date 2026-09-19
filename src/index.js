@@ -227,6 +227,7 @@ const KNOWLEDGE_SEEDS = [
   { name: "URLhaus", url: "https://urlhaus.abuse.ch/", category: "malicious URL intelligence", creator: "abuse.ch", content: "URLhaus provides malicious URL metadata. Retrieval is read-only and does not contact or fetch listed URLs." },
 ];
 const LOCAL_EDR_SEEN = new Set();
+const EDR_HEALTH = { collector: "unknown", visibility: "unknown", lastTelemetryAt: null, lastHeartbeatAt: null, received: 0, processed: 0, rejected: 0, duplicated: 0, dropped: 0, timestampErrors: 0, authenticationFailures: 0, lastError: null };
 
 async function handleKnowledgeRetrieve(request, env) {
   const q = (new URL(request.url).searchParams.get("q") || "").trim().slice(0, 160).toLowerCase();
@@ -266,25 +267,34 @@ async function handleEdrEvents(request, env, options = {}) {
   if (!events.length || events.length > 50) return json({ error: "Send 1 to 50 synthetic EDR events.", state: "REJECTED" }, 400);
   const normalized = [];
   const seen = new Set();
+  EDR_HEALTH.received += events.length;
+  if (options.allowAuthorizedLocal) {
+    EDR_HEALTH.collector = options.collector || "authorized-local";
+    EDR_HEALTH.visibility = options.visibility || "container-local";
+    EDR_HEALTH.lastTelemetryAt = new Date().toISOString();
+  }
   for (const raw of events) {
-    if (!raw || (raw.synthetic !== true && options.allowAuthorizedLocal !== true)) return json({ error: "Only synthetic EDR fixtures are accepted by this endpoint.", state: "REJECTED", rejection: await rejectEdr(env, raw, "synthetic flag is required") }, 403);
-    if (raw.eventVersion !== "edr.process.v1" && raw.eventVersion !== "edr.network.v1" && raw.eventVersion !== "edr.file.v1" && raw.eventVersion !== "edr.identity.v1") return json({ error: "Unsupported eventVersion.", state: "REJECTED", rejection: await rejectEdr(env, raw, "unsupported event version") }, 400);
-    if (!raw.eventId || !raw.eventType || !raw.hostId || !raw.observedAt) return json({ error: "eventId, eventType, hostId, and observedAt are required.", state: "REJECTED", rejection: await rejectEdr(env, raw, "required field missing") }, 400);
+    if (!raw || (raw.synthetic !== true && options.allowAuthorizedLocal !== true)) { EDR_HEALTH.rejected++; return json({ error: "Only synthetic EDR fixtures are accepted by this endpoint.", state: "REJECTED", rejection: await rejectEdr(env, raw, "synthetic flag is required") }, 403); }
+    if (raw.eventVersion !== "edr.process.v1" && raw.eventVersion !== "edr.network.v1" && raw.eventVersion !== "edr.file.v1" && raw.eventVersion !== "edr.identity.v1") { EDR_HEALTH.rejected++; return json({ error: "Unsupported eventVersion.", state: "REJECTED", rejection: await rejectEdr(env, raw, "unsupported event version") }, 400); }
+    if (!raw.eventId || !raw.eventType || !raw.hostId || !raw.observedAt) { EDR_HEALTH.rejected++; return json({ error: "eventId, eventType, hostId, and observedAt are required.", state: "REJECTED", rejection: await rejectEdr(env, raw, "required field missing") }, 400); }
     const expectedType = raw.eventVersion.split(".")[1];
-    if (!String(raw.eventType).toLowerCase().startsWith(expectedType)) return json({ error: "eventType does not match eventVersion.", state: "REJECTED", rejection: await rejectEdr(env, raw, "event version and type mismatch") }, 400);
+    if (!String(raw.eventType).toLowerCase().startsWith(expectedType)) { EDR_HEALTH.rejected++; return json({ error: "eventType does not match eventVersion.", state: "REJECTED", rejection: await rejectEdr(env, raw, "event version and type mismatch") }, 400); }
     const timestamp = new Date(String(raw.observedAt));
-    if (Number.isNaN(timestamp.getTime())) return json({ error: "observedAt must be a valid timestamp.", state: "REJECTED", rejection: await rejectEdr(env, raw, "invalid timestamp") }, 400);
+    if (Number.isNaN(timestamp.getTime())) { EDR_HEALTH.rejected++; return json({ error: "observedAt must be a valid timestamp.", state: "REJECTED", rejection: await rejectEdr(env, raw, "invalid timestamp") }, 400); }
+    if (Math.abs(Date.now() - timestamp.getTime()) > 86400000) EDR_HEALTH.timestampErrors++;
     const eventId = String(raw.eventId).slice(0, 120);
-    if (seen.has(eventId) || LOCAL_EDR_SEEN.has(eventId)) continue;
+    if (seen.has(eventId) || LOCAL_EDR_SEEN.has(eventId)) { EDR_HEALTH.duplicated++; continue; }
     seen.add(eventId);
     LOCAL_EDR_SEEN.add(eventId);
     if (LOCAL_EDR_SEEN.size > 10000) LOCAL_EDR_SEEN.delete(LOCAL_EDR_SEEN.values().next().value);
-    const event = { eventId, observationId: await sha256(JSON.stringify(raw)), eventVersion: raw.eventVersion, eventType: String(raw.eventType).slice(0, 60), hostId: String(raw.hostId).slice(0, 120), observedAt: timestamp.toISOString(), processName: String(raw.processName || "").slice(0, 160), parentProcess: String(raw.parentProcess || "").slice(0, 160), commandLine: String(raw.commandLine || "").slice(0, 500), filePath: String(raw.filePath || "").slice(0, 300), destinationIp: String(raw.destinationIp || "").slice(0, 80), destinationPort: Number.isInteger(raw.destinationPort) ? raw.destinationPort : null, username: String(raw.username || "").slice(0, 120), synthetic: raw.synthetic === true, provenance: raw.provenance || { classification: raw.synthetic === true ? "OBSERVATION" : "LIVE_LOCAL_OBSERVATION", source: raw.collector || "authorized-local-collector", authorization: "authorized-lab-config" } };
+    const event = { eventId, observationId: await sha256(JSON.stringify(raw)), eventVersion: raw.eventVersion, eventType: String(raw.eventType).slice(0, 60), hostId: String(raw.hostId).slice(0, 120), observedAt: timestamp.toISOString(), processName: String(raw.processName || "").slice(0, 160), parentProcess: String(raw.parentProcess || "").slice(0, 160), commandLine: String(raw.commandLine || "").slice(0, 500), filePath: String(raw.filePath || "").slice(0, 300), destinationIp: String(raw.destinationIp || "").slice(0, 80), destinationPort: Number.isInteger(raw.destinationPort) ? raw.destinationPort : null, username: String(raw.username || "").slice(0, 120), synthetic: options.allowAuthorizedLocal ? false : true, provenance: options.allowAuthorizedLocal ? { classification: "LIVE_LOCAL_OBSERVATION", source: options.collector || "authorized-local-collector", authorization: "server-verified-authorized-lab", visibility: options.visibility || "container-local" } : { classification: "SYNTHETIC_FIXTURE", source: "synthetic-edr-fixture", authorization: "synthetic-only", visibility: "synthetic" } };
+    if (options.allowAuthorizedLocal && event.eventType === "identity_heartbeat") EDR_HEALTH.lastHeartbeatAt = new Date().toISOString();
     const detection = detectEdrEvent(event);
     const correlationId = `host:${event.hostId}:event:${event.eventType}`;
     const alertId = `alert:${event.eventId}`;
     normalized.push({ event, detection: { ...detection, alertId, correlationId, evidence: { eventId, observationId: event.observationId, requiredTelemetry: detection.requiredTelemetry } }, audit: [{ stage: "ingest", status: "complete" }, { stage: "validate", status: "complete", schema: event.eventVersion }, { stage: "normalize", status: "complete" }, { stage: "deduplicate", status: "complete" }, { stage: "correlate", status: detection.status === "detected" ? "inferred-candidate" : "no-match" }, { stage: "detect", status: detection.status }, { stage: "alert", status: detection.status === "detected" ? "created" : "not-created" }, { stage: "display", status: "complete" }] });
   }
+  EDR_HEALTH.processed += normalized.length;
   let stored = false;
   const db = aiDb(env);
   if (db) {
@@ -297,20 +307,36 @@ async function handleEdrEvents(request, env, options = {}) {
       stored = true;
     } catch { stored = false; }
   }
-  return json({ ok: true, mode: options.allowAuthorizedLocal ? "authorized-local" : (db ? "d1-or-fallback" : "synthetic-local"), health: db ? "PARTIALLY_OPERATIONAL" : "DEGRADED", count: normalized.length, received: events.length, processed: normalized.length, duplicates: events.length - normalized.length, rejected: 0, stored, events: normalized });
+  return json({ ok: true, mode: options.allowAuthorizedLocal ? "authorized-local" : (db ? "d1-or-fallback" : "synthetic-local"), health: db ? "PARTIALLY_OPERATIONAL" : "DEGRADED", collector: EDR_HEALTH.collector, visibility: EDR_HEALTH.visibility, count: normalized.length, received: events.length, processed: normalized.length, duplicates: events.length - normalized.length, rejected: 0, stored, events: normalized });
 }
 
 async function handleAuthorizedCollectorIngest(request, env) {
   const token = env.INGEST_TOKEN;
   if (!token) return json({ error: "Collector ingestion is not configured.", state: "DEGRADED" }, 503);
-  if (request.headers.get("Authorization") !== "Bearer " + token) return json({ error: "Unauthorized collector.", state: "REJECTED" }, 401);
+  if (request.headers.get("Authorization") !== "Bearer " + token) { EDR_HEALTH.authenticationFailures++; return json({ error: "Unauthorized collector.", state: "REJECTED" }, 401); }
   let body; try { body = await request.json(); } catch { return json({ error: "Invalid collector JSON.", state: "REJECTED" }, 400); }
   const lab = body && body.lab;
   if (!lab || lab.environment !== "authorized-lab" || !["osquery", "local-proc"].includes(lab.collector) || lab.target_type !== "local" || lab.remote_targets !== false || lab.external_scanning !== false || lab.production_access !== false || lab.telemetry_only !== true) return json({ error: "Collector lab policy rejected. Only local telemetry-only osquery or explicitly labeled local-proc collection is accepted.", state: "REJECTED" }, 403);
   const sourceEvents = Array.isArray(body.events) ? body.events : [];
   if (!sourceEvents.length || sourceEvents.length > 50) return json({ error: "Collector must send 1 to 50 events.", state: "REJECTED" }, 400);
-  const events = sourceEvents.map((event) => ({ ...event, synthetic: false, collector: event.collector || "osquery", provenance: { classification: "LIVE_LOCAL_OBSERVATION", source: event.collector || "osquery", authorization: "authorized-lab-local", collectionTimestamp: new Date().toISOString(), ...(event.provenance || {}) } }));
-  return handleEdrEvents(new Request(request.url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ events }) }), env, { allowAuthorizedLocal: true });
+  const events = sourceEvents.map((event) => ({ ...event, synthetic: false, collector: lab.collector }));
+  return handleEdrEvents(new Request(request.url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ events }) }), env, { allowAuthorizedLocal: true, collector: lab.collector, visibility: lab.collector === "osquery" ? "host-level" : "container-local" });
+}
+
+async function handleEdrHealth() {
+  const last = EDR_HEALTH.lastTelemetryAt ? Date.parse(EDR_HEALTH.lastTelemetryAt) : 0;
+  const ageSeconds = last ? Math.max(0, Math.round((Date.now() - last) / 1000)) : null;
+  const heartbeat = EDR_HEALTH.lastHeartbeatAt ? Date.parse(EDR_HEALTH.lastHeartbeatAt) : 0;
+  const heartbeatAgeSeconds = heartbeat ? Math.max(0, Math.round((Date.now() - heartbeat) / 1000)) : null;
+  const trustReasons = [];
+  if (!last) trustReasons.push("no telemetry observed");
+  if (ageSeconds !== null && ageSeconds > 90) trustReasons.push("telemetry stale");
+  if (!heartbeat || heartbeatAgeSeconds > 90) trustReasons.push("collector heartbeat missing or stale");
+  if (EDR_HEALTH.timestampErrors) trustReasons.push("timestamp consistency errors observed");
+  if (EDR_HEALTH.authenticationFailures) trustReasons.push("authentication failures observed");
+  const trust = trustReasons.length ? (last && ageSeconds <= 90 ? "DEGRADED" : "UNVERIFIED") : "VERIFIED";
+  const state = trust === "VERIFIED" ? "HEALTHY" : trust === "DEGRADED" ? "DEGRADED" : last ? "DATA_GAP" : "FAILED";
+  return json({ ok: true, state, telemetryTrust: trust, trustReasons, collector: EDR_HEALTH.collector, visibility: EDR_HEALTH.visibility, freshness: { lastTelemetryAt: EDR_HEALTH.lastTelemetryAt, ageSeconds, lastHeartbeatAt: EDR_HEALTH.lastHeartbeatAt, heartbeatAgeSeconds, staleAfterSeconds: 90 }, metrics: { ...EDR_HEALTH } });
 }
 
 async function handleSourceCatalog(request, env) {
@@ -517,6 +543,7 @@ const PAGE = `<!DOCTYPE html>
   <section class="grid">
     <article class="card"><h2>Evidence retrieval</h2><p class="muted">Retrieve content-bearing, provenance-labeled material from the local knowledge index. Results are context, not proof of compromise.</p><div class="row"><input id="retrieve-query" class="text-input" value="incident response" aria-label="Retrieval query"><button id="retrieve" class="cta" type="button">Retrieve content</button></div><pre id="retrieval-output" class="proof-output" hidden></pre></article>
     <article class="card"><h2>Synthetic EDR pipeline</h2><p class="muted">Run one harmless fixture through ingest, normalization, correlation, detection, display, and audit logging. No host agent or real target is contacted.</p><button id="edr-demo" class="cta secondary" type="button">Run synthetic EDR check</button><pre id="edr-output" class="proof-output" hidden></pre></article>
+    <article class="card"><h2>EDR health and visibility</h2><p class="muted">Health is based on recent telemetry, not application uptime. Visibility is server-labeled and never upgrades container-local data to host-level EDR.</p><div id="edr-health" class="health-panel">Checking telemetry health&hellip;</div></article>
   </section>
   <section id="results" hidden>
     <div class="grid">
@@ -574,6 +601,7 @@ textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
 .tile .t{font-size:.75rem;color:var(--muted)}
 .tagline{color:var(--muted);font-size:.85rem;margin:12px 0 0}
 .proof-output{white-space:pre-wrap;overflow:auto;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--muted);padding:12px;margin:16px 0 0;font-size:.78rem;max-height:360px}
+.health-panel{background:var(--chip);border:1px solid var(--border);border-radius:10px;padding:12px;color:var(--muted);font-size:.85rem;white-space:pre-line}
 footer{border-top:1px solid var(--border);padding:24px 6vw;color:var(--muted);font-size:.85rem}
 footer p{margin:0}`;
 
@@ -643,7 +671,7 @@ $("edr-demo").addEventListener("click", async () => {
   const output = $("edr-output");
   $("edr-demo").disabled = true;
   try {
-    const res = await fetch("/api/edr/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ synthetic: true, eventId: "dashboard-fixture-" + Date.now(), eventType: "process_start", observedAt: new Date().toISOString(), hostId: "synthetic-host-01", processName: "powershell.exe", parentProcess: "outlook.exe", commandLine: "powershell -NoProfile -Command synthetic_fixture", username: "synthetic-user" }) });
+    const res = await fetch("/api/edr/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ synthetic: true, eventVersion: "edr.process.v1", eventId: "dashboard-fixture-" + Date.now(), eventType: "process_start", observedAt: new Date().toISOString(), hostId: "synthetic-host-01", processName: "powershell.exe", parentProcess: "outlook.exe", commandLine: "powershell -NoProfile -Command synthetic_fixture", username: "synthetic-user" }) });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "EDR check failed (" + res.status + ")");
     output.hidden = false; output.textContent = JSON.stringify(data, null, 2);
@@ -660,6 +688,27 @@ async function loadSources() {
   } catch (e) { $("source-catalog").textContent = "Source catalog unavailable until the D1 schema is applied."; }
 }
 loadSources();
+
+async function loadEdrHealth() {
+  try {
+    const res = await fetch("/api/edr/health");
+    const data = await res.json();
+    const m = data.metrics || {};
+    $("edr-health").textContent = [
+      "State: " + data.state,
+      "Telemetry trust: " + data.telemetryTrust,
+      "Trust reasons: " + ((data.trustReasons && data.trustReasons.length) ? data.trustReasons.join(", ") : "none"),
+      "Visibility: " + data.visibility,
+      "Collector: " + data.collector,
+      "Last telemetry: " + (data.freshness && data.freshness.lastTelemetryAt || "UNKNOWN"),
+      "Telemetry age: " + (data.freshness && data.freshness.ageSeconds === null ? "UNKNOWN" : (data.freshness && data.freshness.ageSeconds) + "s"),
+      "Received / processed / rejected / duplicated: " + [m.received, m.processed, m.rejected, m.duplicated].join(" / "),
+      "Auth failures / dropped: " + [m.authenticationFailures, m.dropped].join(" / ")
+    ].join("\n");
+  } catch (e) { $("edr-health").textContent = "State: UNKNOWN\nHealth endpoint unavailable"; }
+}
+loadEdrHealth();
+setInterval(loadEdrHealth, 15000);
 
 function render(d) {
   $("results").hidden = false;
@@ -702,6 +751,7 @@ export default {
     if (request.method === "GET" && url.pathname === "/api/observatory/retrieve") return handleKnowledgeRetrieve(request, env);
     if (request.method === "POST" && url.pathname === "/api/edr/events") return handleEdrEvents(request, env);
     if (request.method === "POST" && url.pathname === "/api/edr/ingest") return handleAuthorizedCollectorIngest(request, env);
+    if (request.method === "GET" && url.pathname === "/api/edr/health") return handleEdrHealth();
     if (request.method === "POST" && url.pathname === "/api/ai/feedback") return handleFeedback(request, env);
     if (request.method === "POST" && url.pathname === "/api/observatory/proof") return handleObservatoryProof(request, env);
     return new Response("Not found", { status: 404, headers: secHeaders({ "content-type": "text/plain; charset=utf-8" }) });

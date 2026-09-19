@@ -28,10 +28,15 @@ transform retrieved material into instructions for attacking real systems.
 ## Deploy
 
 ```sh
-npx wrangler secret put INGEST_TOKEN   # ingestion bearer token
-npx wrangler d1 execute blog_db --remote --file=schema-corpora.sql
-npx wrangler deploy
+npm ci
+npm exec -- wrangler secret put INGEST_TOKEN   # ingestion bearer token
+npm exec -- wrangler d1 execute blog_db --remote --file=schema-corpora.sql
+npm exec -- wrangler deploy
 ```
+
+The repository pins the supported runtime to **Node.js 24** through `engines.node` and `.nvmrc`, and pins Wrangler through `package-lock.json`; CI installs both with `npm ci` rather than a global or temporary CLI.
+
+`GET /api/edr/health` reports server-derived `telemetryTrust` (`VERIFIED`, `DEGRADED`, or `UNVERIFIED`) alongside freshness, heartbeat, duplicate, rejection, authentication-failure, and timestamp-quality metrics. `visibility` remains explicit: `container-local`, `host-level`, `synthetic`, or `unknown`.
 
 Zero npm dependencies. Strict CSP, rate limiting, dark-mode-first UI.
 Model: `@cf/openai/gpt-oss-20b` (Workers AI) with `max_tokens: 2048`.

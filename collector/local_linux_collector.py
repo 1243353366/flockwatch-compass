@@ -38,7 +38,12 @@ def process_rows():
 
 def build_payload(config):
     observed = now()
-    events = []
+    heartbeat = {"table": "collector_heartbeat", "collector": "local-proc", "observedAt": observed}
+    events = [{
+        "synthetic": False, "collector": "local-proc", "eventVersion": "edr.identity.v1", "eventType": "identity_heartbeat",
+        "eventId": "local-proc-heartbeat-" + event_id("heartbeat", heartbeat, observed).split("osquery-", 1)[-1], "observedAt": observed,
+        "hostId": config["endpoint_id"], "username": "", "provenance": {"classification": "LIVE_LOCAL_OBSERVATION", "source": "local-proc", "table": "collector_heartbeat", "authorization": "authorized-lab-local", "collectionTimestamp": observed, "visibility": "container-local"}
+    }]
     for row in process_rows():
         events.append({
             "synthetic": False, "collector": "local-proc", "eventVersion": "edr.process.v1", "eventType": "process_observation",
