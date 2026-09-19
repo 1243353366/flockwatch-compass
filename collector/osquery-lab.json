@@ -1,0 +1,15 @@
+{
+  "environment": "authorized-lab",
+  "collector": "osquery",
+  "target_type": "local",
+  "endpoint_id": "local-lab-linux-01",
+  "remote_targets": false,
+  "external_scanning": false,
+  "production_access": false,
+  "simulation_mode": false,
+  "telemetry_only": true,
+  "ingest_url": "http://127.0.0.1:8787/api/edr/ingest",
+  "token_env": "INGEST_TOKEN",
+  "osquery_binary": "osqueryi",
+  "interval_seconds": 30
+}

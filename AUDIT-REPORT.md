@@ -249,3 +249,21 @@ The detection record separates rule version, severity, confidence, alert ID, cor
 The retrieval path now returns actual content from the embedded seed corpus when D1 is unavailable and queries `ai_knowledge_documents` when D1 is available. The dashboard exposes both retrieval results and the synthetic EDR pipeline output. The embedded content is provenance-labeled and reference-only. The endpoint-security projects listed in the supplied hardening note are credited in [UPSTREAM-CREDITS.md](UPSTREAM-CREDITS.md); no upstream code or runtime dependency was copied.
 
 The hardening slice was smoke-tested with a suspicious synthetic process event, a benign synthetic process event, an unsupported-version rejection, content retrieval for NIST incident response, and source-catalog content. It remains **PARTIAL** as an EDR system because no osquery, OpenEDR, OpenDR, Falco, or other endpoint collector is installed or connected, and no live endpoint telemetry is collected.
+
+
+## Authorized local osquery collector
+
+A real collector implementation now exists at [collector/osquery_collector.py](collector/osquery_collector.py). It runs only fixed, read-oriented osquery queries for processes, listening ports, and users. Its configuration requires `authorized-lab`, `osquery`, `local`, `remote_targets=false`, `external_scanning=false`, `production_access=false`, and `telemetry_only=true`. The ingestion URL must be localhost HTTP or HTTPS. The collector refuses remote configurations and refuses to substitute another data source when `osqueryi` is absent.
+
+The authenticated collector path is:
+
+```text
+local osqueryi → fixed query result → event hash/version/provenance
+→ Bearer-authenticated /api/edr/ingest → validation → normalization
+→ deduplication → detection → optional D1 storage → audit response
+```
+
+Collector source compilation and safety-gate tests passed. Live endpoint collection remains **UNTESTED** in this environment because `osqueryi` is not installed. This is intentionally not represented as a PASS. The installation and canary steps are documented in [collector/README.md](collector/README.md).
+
+
+A localhost integration test also passed using `collector/local_linux_collector.py`: readable `/proc` process observations were collected from the running application environment, authenticated with the lab token, accepted by `/api/edr/ingest`, normalized, deduplicated, correlated, evaluated, and returned with an audit trail. These events are explicitly labeled `collector=local-proc` and `visibility=container-local`. They are not equivalent to host-level EDR. The osquery path remains the preferred real host source and remains unverified until `osqueryi` is installed on the authorized self-hosted Linux host.

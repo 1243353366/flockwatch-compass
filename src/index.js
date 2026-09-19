@@ -260,14 +260,14 @@ async function rejectEdr(env, raw, reason) {
   return { rejectionId, reason, logged: Boolean(db) };
 }
 
-async function handleEdrEvents(request, env) {
+async function handleEdrEvents(request, env, options = {}) {
   const body = await request.json().catch(() => null);
   const events = Array.isArray(body) ? body : body && Array.isArray(body.events) ? body.events : body ? [body] : [];
   if (!events.length || events.length > 50) return json({ error: "Send 1 to 50 synthetic EDR events.", state: "REJECTED" }, 400);
   const normalized = [];
   const seen = new Set();
   for (const raw of events) {
-    if (!raw || raw.synthetic !== true) return json({ error: "Only synthetic EDR fixtures are accepted by this endpoint.", state: "REJECTED", rejection: await rejectEdr(env, raw, "synthetic flag is required") }, 403);
+    if (!raw || (raw.synthetic !== true && options.allowAuthorizedLocal !== true)) return json({ error: "Only synthetic EDR fixtures are accepted by this endpoint.", state: "REJECTED", rejection: await rejectEdr(env, raw, "synthetic flag is required") }, 403);
     if (raw.eventVersion !== "edr.process.v1" && raw.eventVersion !== "edr.network.v1" && raw.eventVersion !== "edr.file.v1" && raw.eventVersion !== "edr.identity.v1") return json({ error: "Unsupported eventVersion.", state: "REJECTED", rejection: await rejectEdr(env, raw, "unsupported event version") }, 400);
     if (!raw.eventId || !raw.eventType || !raw.hostId || !raw.observedAt) return json({ error: "eventId, eventType, hostId, and observedAt are required.", state: "REJECTED", rejection: await rejectEdr(env, raw, "required field missing") }, 400);
     const expectedType = raw.eventVersion.split(".")[1];
@@ -279,7 +279,7 @@ async function handleEdrEvents(request, env) {
     seen.add(eventId);
     LOCAL_EDR_SEEN.add(eventId);
     if (LOCAL_EDR_SEEN.size > 10000) LOCAL_EDR_SEEN.delete(LOCAL_EDR_SEEN.values().next().value);
-    const event = { eventId, observationId: await sha256(JSON.stringify(raw)), eventVersion: raw.eventVersion, eventType: String(raw.eventType).slice(0, 60), hostId: String(raw.hostId).slice(0, 120), observedAt: timestamp.toISOString(), processName: String(raw.processName || "").slice(0, 160), parentProcess: String(raw.parentProcess || "").slice(0, 160), commandLine: String(raw.commandLine || "").slice(0, 500), filePath: String(raw.filePath || "").slice(0, 300), destinationIp: String(raw.destinationIp || "").slice(0, 80), destinationPort: Number.isInteger(raw.destinationPort) ? raw.destinationPort : null, username: String(raw.username || "").slice(0, 120), synthetic: true, provenance: { classification: "OBSERVATION", source: "synthetic-edr-fixture", authorization: "local-defensive-test" } };
+    const event = { eventId, observationId: await sha256(JSON.stringify(raw)), eventVersion: raw.eventVersion, eventType: String(raw.eventType).slice(0, 60), hostId: String(raw.hostId).slice(0, 120), observedAt: timestamp.toISOString(), processName: String(raw.processName || "").slice(0, 160), parentProcess: String(raw.parentProcess || "").slice(0, 160), commandLine: String(raw.commandLine || "").slice(0, 500), filePath: String(raw.filePath || "").slice(0, 300), destinationIp: String(raw.destinationIp || "").slice(0, 80), destinationPort: Number.isInteger(raw.destinationPort) ? raw.destinationPort : null, username: String(raw.username || "").slice(0, 120), synthetic: raw.synthetic === true, provenance: raw.provenance || { classification: raw.synthetic === true ? "OBSERVATION" : "LIVE_LOCAL_OBSERVATION", source: raw.collector || "authorized-local-collector", authorization: "authorized-lab-config" } };
     const detection = detectEdrEvent(event);
     const correlationId = `host:${event.hostId}:event:${event.eventType}`;
     const alertId = `alert:${event.eventId}`;
@@ -291,13 +291,26 @@ async function handleEdrEvents(request, env) {
     try {
       const statements = [];
       for (const item of normalized) {
-        const e = item.event; const d = item.detection; statements.push(db.prepare("INSERT OR IGNORE INTO edr_events (event_id, observation_id, event_version, event_type, observed_at, host_id, process_name, parent_process, command_line, file_path, destination_ip, destination_port, username, synthetic, provenance_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)").bind(e.eventId, e.observationId, e.eventVersion, e.eventType, e.observedAt, e.hostId, e.processName, e.parentProcess, e.commandLine, e.filePath, e.destinationIp, e.destinationPort, e.username, JSON.stringify(e.provenance))); statements.push(db.prepare("INSERT OR IGNORE INTO edr_detections (event_id, alert_id, correlation_id, rule_id, rule_version, severity, confidence, status, rationale, false_positive_notes, evidence_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(e.eventId, d.alertId, d.correlationId, d.ruleId, d.ruleVersion, d.severity, d.confidence, d.status, d.rationale, d.falsePositiveNotes, JSON.stringify(d.evidence)));
+        const e = item.event; const d = item.detection; statements.push(db.prepare("INSERT OR IGNORE INTO edr_events (event_id, observation_id, event_version, event_type, observed_at, host_id, process_name, parent_process, command_line, file_path, destination_ip, destination_port, username, synthetic, provenance_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(e.eventId, e.observationId, e.eventVersion, e.eventType, e.observedAt, e.hostId, e.processName, e.parentProcess, e.commandLine, e.filePath, e.destinationIp, e.destinationPort, e.username, e.synthetic ? 1 : 0, JSON.stringify(e.provenance))); statements.push(db.prepare("INSERT OR IGNORE INTO edr_detections (event_id, alert_id, correlation_id, rule_id, rule_version, severity, confidence, status, rationale, false_positive_notes, evidence_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(e.eventId, d.alertId, d.correlationId, d.ruleId, d.ruleVersion, d.severity, d.confidence, d.status, d.rationale, d.falsePositiveNotes, JSON.stringify(d.evidence)));
       }
       await db.batch(statements);
       stored = true;
     } catch { stored = false; }
   }
-  return json({ ok: true, mode: db ? "d1-or-fallback" : "synthetic-local", health: db ? "PARTIALLY_OPERATIONAL" : "DEGRADED", count: normalized.length, received: events.length, processed: normalized.length, duplicates: events.length - normalized.length, rejected: 0, stored, events: normalized });
+  return json({ ok: true, mode: options.allowAuthorizedLocal ? "authorized-local" : (db ? "d1-or-fallback" : "synthetic-local"), health: db ? "PARTIALLY_OPERATIONAL" : "DEGRADED", count: normalized.length, received: events.length, processed: normalized.length, duplicates: events.length - normalized.length, rejected: 0, stored, events: normalized });
+}
+
+async function handleAuthorizedCollectorIngest(request, env) {
+  const token = env.INGEST_TOKEN;
+  if (!token) return json({ error: "Collector ingestion is not configured.", state: "DEGRADED" }, 503);
+  if (request.headers.get("Authorization") !== "Bearer " + token) return json({ error: "Unauthorized collector.", state: "REJECTED" }, 401);
+  let body; try { body = await request.json(); } catch { return json({ error: "Invalid collector JSON.", state: "REJECTED" }, 400); }
+  const lab = body && body.lab;
+  if (!lab || lab.environment !== "authorized-lab" || !["osquery", "local-proc"].includes(lab.collector) || lab.target_type !== "local" || lab.remote_targets !== false || lab.external_scanning !== false || lab.production_access !== false || lab.telemetry_only !== true) return json({ error: "Collector lab policy rejected. Only local telemetry-only osquery or explicitly labeled local-proc collection is accepted.", state: "REJECTED" }, 403);
+  const sourceEvents = Array.isArray(body.events) ? body.events : [];
+  if (!sourceEvents.length || sourceEvents.length > 50) return json({ error: "Collector must send 1 to 50 events.", state: "REJECTED" }, 400);
+  const events = sourceEvents.map((event) => ({ ...event, synthetic: false, collector: event.collector || "osquery", provenance: { classification: "LIVE_LOCAL_OBSERVATION", source: event.collector || "osquery", authorization: "authorized-lab-local", collectionTimestamp: new Date().toISOString(), ...(event.provenance || {}) } }));
+  return handleEdrEvents(new Request(request.url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ events }) }), env, { allowAuthorizedLocal: true });
 }
 
 async function handleSourceCatalog(request, env) {
@@ -688,6 +701,7 @@ export default {
     if (request.method === "GET" && url.pathname === "/api/corpora/sources") return handleSourceCatalog(request, env);
     if (request.method === "GET" && url.pathname === "/api/observatory/retrieve") return handleKnowledgeRetrieve(request, env);
     if (request.method === "POST" && url.pathname === "/api/edr/events") return handleEdrEvents(request, env);
+    if (request.method === "POST" && url.pathname === "/api/edr/ingest") return handleAuthorizedCollectorIngest(request, env);
     if (request.method === "POST" && url.pathname === "/api/ai/feedback") return handleFeedback(request, env);
     if (request.method === "POST" && url.pathname === "/api/observatory/proof") return handleObservatoryProof(request, env);
     return new Response("Not found", { status: 404, headers: secHeaders({ "content-type": "text/plain; charset=utf-8" }) });
