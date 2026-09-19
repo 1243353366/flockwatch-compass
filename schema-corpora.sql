@@ -104,3 +104,79 @@ INSERT OR IGNORE INTO ai_source_catalog (name, url, category, creator, usage_mod
 ('ANY.RUN public reports', 'https://any.run/', 'sandbox reports', 'ANY.RUN', 'reference-only', 'Public analysis reports used as secondary evidence only.'),
 ('CAPE Sandbox', 'https://github.com/kevoreilly/capemon', 'sandbox analysis', 'CAPE contributors / @kevoreilly', 'reference-only', 'Sandbox methodology reference; not invoked by this Worker.'),
 ('VX-Underground', 'https://vx-underground.org/', 'malware research archive', 'VX-Underground', 'reference-only', 'Research archive reference; no samples are bundled or executed.');
+
+
+-- Content-bearing knowledge documents used by read-only retrieval.
+CREATE TABLE IF NOT EXISTS ai_knowledge_documents (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source_name TEXT NOT NULL,
+  source_url TEXT NOT NULL UNIQUE,
+  category TEXT NOT NULL,
+  creator TEXT NOT NULL,
+  content TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  observed_at TEXT NOT NULL DEFAULT (datetime('now')),
+  expires_at TEXT,
+  provenance_json TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS idx_ai_knowledge_documents_category ON ai_knowledge_documents(category);
+
+INSERT OR IGNORE INTO ai_knowledge_documents (source_name, source_url, category, creator, content, content_hash, provenance_json) VALUES
+('MITRE ATT&CK', 'https://attack.mitre.org/', 'behavior vocabulary', 'The MITRE Corporation / @mitre-attack', 'MITRE ATT&CK is a knowledge base for adversary tactics and techniques. Use it as a behavioral vocabulary and map only behaviors supported by evidence; observing one technique does not establish a complete attack chain.', 'seed-mitre-attack-v1', '{"classification":"REFERENCE","usage":"defensive-analysis"}'),
+('NIST SP 800-61', 'https://csrc.nist.gov/pubs/sp/800/61/r2/final', 'incident response', 'NIST / @NIST', 'Incident response guidance organizes preparation, detection and analysis, containment, eradication and recovery, and post-incident activity. Preserve evidence and record decisions throughout the lifecycle.', 'seed-nist-800-61-v1', '{"classification":"REFERENCE","usage":"incident-response"}'),
+('NIST SP 800-115', 'https://csrc.nist.gov/pubs/sp/800/115/final', 'security testing', 'NIST / @NIST', 'Technical security testing requires planning, authorization, defined scope, controlled execution, evidence collection, and reporting. Testing must not silently expand to systems outside the approved scope.', 'seed-nist-800-115-v1', '{"classification":"REFERENCE","usage":"authorized-testing"}'),
+('CISA KEV Catalog', 'https://www.cisa.gov/known-exploited-vulnerabilities-catalog', 'vulnerability intelligence', 'CISA / @CISA', 'The Known Exploited Vulnerabilities Catalog identifies vulnerabilities with evidence of exploitation and supports remediation prioritization. Catalog membership is not proof that a specific local asset is compromised.', 'seed-cisa-kev-v1', '{"classification":"REFERENCE","usage":"prioritization"}'),
+('MalwareBazaar', 'https://bazaar.abuse.ch/', 'malware intelligence', 'abuse.ch', 'MalwareBazaar provides malware sample metadata and indicators. This deployment stores reference content only and does not download or execute samples.', 'seed-malwarebazaar-v1', '{"classification":"REFERENCE","usage":"metadata-only"}'),
+('ThreatFox', 'https://threatfox.abuse.ch/', 'indicator intelligence', 'abuse.ch', 'ThreatFox provides indicator relationships and sightings. Indicators remain hypotheses until corroborated with local telemetry and timestamps.', 'seed-threatfox-v1', '{"classification":"REFERENCE","usage":"indicator-correlation"}'),
+('URLhaus', 'https://urlhaus.abuse.ch/', 'malicious URL intelligence', 'abuse.ch', 'URLhaus provides malicious URL metadata. Retrieval is read-only and does not contact or fetch the listed URLs.', 'seed-urlhaus-v1', '{"classification":"REFERENCE","usage":"metadata-only"}');
+
+-- Synthetic EDR events are structured telemetry fixtures, not host agents.
+CREATE TABLE IF NOT EXISTS edr_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  event_id TEXT NOT NULL UNIQUE,
+  observation_id TEXT NOT NULL UNIQUE,
+  event_version TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  observed_at TEXT NOT NULL,
+  host_id TEXT NOT NULL,
+  process_name TEXT NOT NULL DEFAULT '',
+  parent_process TEXT NOT NULL DEFAULT '',
+  command_line TEXT NOT NULL DEFAULT '',
+  file_path TEXT NOT NULL DEFAULT '',
+  destination_ip TEXT NOT NULL DEFAULT '',
+  destination_port INTEGER,
+  username TEXT NOT NULL DEFAULT '',
+  synthetic INTEGER NOT NULL DEFAULT 1,
+  provenance_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_edr_events_observed_at ON edr_events(observed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_edr_events_host_id ON edr_events(host_id);
+
+CREATE TABLE IF NOT EXISTS edr_detections (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  event_id TEXT NOT NULL,
+  alert_id TEXT NOT NULL UNIQUE,
+  correlation_id TEXT NOT NULL,
+  rule_id TEXT NOT NULL,
+  rule_version TEXT NOT NULL,
+  severity TEXT NOT NULL,
+  confidence REAL NOT NULL,
+  status TEXT NOT NULL,
+  rationale TEXT NOT NULL,
+  false_positive_notes TEXT NOT NULL,
+  evidence_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_edr_detections_event_id ON edr_detections(event_id);
+
+
+CREATE TABLE IF NOT EXISTS edr_rejections (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  rejection_id TEXT NOT NULL UNIQUE,
+  reason TEXT NOT NULL,
+  event_hash TEXT NOT NULL,
+  event_version TEXT NOT NULL DEFAULT 'unknown',
+  received_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_edr_rejections_received_at ON edr_rejections(received_at DESC);

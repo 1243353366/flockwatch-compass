@@ -217,10 +217,96 @@ async function handleCorporaSearch(request, env) {
   }
 }
 
+const KNOWLEDGE_SEEDS = [
+  { name: "MITRE ATT&CK", url: "https://attack.mitre.org/", category: "behavior vocabulary", creator: "The MITRE Corporation / @mitre-attack", content: "MITRE ATT&CK is a knowledge base for adversary tactics and techniques. Map only behaviors supported by evidence; observing one technique does not establish a complete attack chain." },
+  { name: "NIST SP 800-61", url: "https://csrc.nist.gov/pubs/sp/800/61/r2/final", category: "incident response", creator: "NIST / @NIST", content: "Incident response guidance organizes preparation, detection and analysis, containment, eradication and recovery, and post-incident activity. Preserve evidence and record decisions throughout the lifecycle." },
+  { name: "NIST SP 800-115", url: "https://csrc.nist.gov/pubs/sp/800/115/final", category: "security testing", creator: "NIST / @NIST", content: "Technical security testing requires planning, authorization, defined scope, controlled execution, evidence collection, and reporting. Testing must not silently expand outside approved scope." },
+  { name: "CISA KEV Catalog", url: "https://www.cisa.gov/known-exploited-vulnerabilities-catalog", category: "vulnerability intelligence", creator: "CISA / @CISA", content: "The Known Exploited Vulnerabilities Catalog supports remediation prioritization. Catalog membership is not proof that a specific local asset is compromised." },
+  { name: "MalwareBazaar", url: "https://bazaar.abuse.ch/", category: "malware intelligence", creator: "abuse.ch", content: "MalwareBazaar provides sample metadata and indicators. This deployment stores reference content only and does not download or execute samples." },
+  { name: "ThreatFox", url: "https://threatfox.abuse.ch/", category: "indicator intelligence", creator: "abuse.ch", content: "ThreatFox provides indicator relationships and sightings. Indicators remain hypotheses until corroborated with local telemetry and timestamps." },
+  { name: "URLhaus", url: "https://urlhaus.abuse.ch/", category: "malicious URL intelligence", creator: "abuse.ch", content: "URLhaus provides malicious URL metadata. Retrieval is read-only and does not contact or fetch listed URLs." },
+];
+const LOCAL_EDR_SEEN = new Set();
+
+async function handleKnowledgeRetrieve(request, env) {
+  const q = (new URL(request.url).searchParams.get("q") || "").trim().slice(0, 160).toLowerCase();
+  if (!q) return json({ error: "Parameter 'q' is required." }, 400);
+  const db = aiDb(env);
+  if (db) {
+    try {
+      const like = `%${q}%`;
+      const { results } = await db.prepare("SELECT source_name AS name, source_url AS url, category, creator, content, content_hash, observed_at FROM ai_knowledge_documents WHERE lower(source_name) LIKE ? OR lower(category) LIKE ? OR lower(content) LIKE ? ORDER BY observed_at DESC LIMIT 10").bind(like, like, like).all();
+      return json({ ok: true, mode: "d1", query: q, count: results.length, results });
+    } catch { /* use embedded seeds as a safe fallback */ }
+  }
+  const results = KNOWLEDGE_SEEDS.filter((item) => `${item.name} ${item.category} ${item.content}`.toLowerCase().includes(q)).map((item) => ({ ...item, content_hash: "embedded-seed", observed_at: null }));
+  return json({ ok: true, mode: "embedded-seed", query: q, count: results.length, results });
+}
+
+function detectEdrEvent(event) {
+  const command = event.commandLine.toLowerCase();
+  const process = event.processName.toLowerCase();
+  const suspicious = ["powershell", "rundll32", "regsvr32", "mshta", "wscript", "cscript"].some((name) => process.includes(name) || command.includes(name));
+  const ruleId = suspicious ? "EDR-SYNTH-001-suspicious-script-interpreter" : "EDR-SYNTH-000-no-match";
+  return { ruleId, ruleVersion: "1", severity: suspicious ? "medium" : "informational", confidence: suspicious ? 0.78 : 0.1, status: suspicious ? "detected" : "no-threat-observed", rationale: suspicious ? "A synthetic script-interpreter event matched a bounded defensive rule; validate parent process, command line, and user context before action." : "No bounded synthetic rule matched this event; this is not proof that no threat exists.", falsePositiveNotes: "Administrative automation and software deployment can resemble this pattern.", requiredTelemetry: ["process_name", "parent_process", "command_line", "observed_at", "host_id"] };
+}
+
+async function rejectEdr(env, raw, reason) {
+  const rejectionId = "rejection-" + crypto.randomUUID();
+  const db = aiDb(env);
+  if (db) {
+    try { await db.prepare("INSERT INTO edr_rejections (rejection_id, reason, event_hash, event_version) VALUES (?, ?, ?, ?)").bind(rejectionId, reason, await sha256(JSON.stringify(raw || {})), String(raw && raw.eventVersion || "unknown").slice(0, 40)).run(); } catch { /* preserve the response even if quarantine storage is unavailable */ }
+  }
+  return { rejectionId, reason, logged: Boolean(db) };
+}
+
+async function handleEdrEvents(request, env) {
+  const body = await request.json().catch(() => null);
+  const events = Array.isArray(body) ? body : body && Array.isArray(body.events) ? body.events : body ? [body] : [];
+  if (!events.length || events.length > 50) return json({ error: "Send 1 to 50 synthetic EDR events.", state: "REJECTED" }, 400);
+  const normalized = [];
+  const seen = new Set();
+  for (const raw of events) {
+    if (!raw || raw.synthetic !== true) return json({ error: "Only synthetic EDR fixtures are accepted by this endpoint.", state: "REJECTED", rejection: await rejectEdr(env, raw, "synthetic flag is required") }, 403);
+    if (raw.eventVersion !== "edr.process.v1" && raw.eventVersion !== "edr.network.v1" && raw.eventVersion !== "edr.file.v1" && raw.eventVersion !== "edr.identity.v1") return json({ error: "Unsupported eventVersion.", state: "REJECTED", rejection: await rejectEdr(env, raw, "unsupported event version") }, 400);
+    if (!raw.eventId || !raw.eventType || !raw.hostId || !raw.observedAt) return json({ error: "eventId, eventType, hostId, and observedAt are required.", state: "REJECTED", rejection: await rejectEdr(env, raw, "required field missing") }, 400);
+    const expectedType = raw.eventVersion.split(".")[1];
+    if (!String(raw.eventType).toLowerCase().startsWith(expectedType)) return json({ error: "eventType does not match eventVersion.", state: "REJECTED", rejection: await rejectEdr(env, raw, "event version and type mismatch") }, 400);
+    const timestamp = new Date(String(raw.observedAt));
+    if (Number.isNaN(timestamp.getTime())) return json({ error: "observedAt must be a valid timestamp.", state: "REJECTED", rejection: await rejectEdr(env, raw, "invalid timestamp") }, 400);
+    const eventId = String(raw.eventId).slice(0, 120);
+    if (seen.has(eventId) || LOCAL_EDR_SEEN.has(eventId)) continue;
+    seen.add(eventId);
+    LOCAL_EDR_SEEN.add(eventId);
+    if (LOCAL_EDR_SEEN.size > 10000) LOCAL_EDR_SEEN.delete(LOCAL_EDR_SEEN.values().next().value);
+    const event = { eventId, observationId: await sha256(JSON.stringify(raw)), eventVersion: raw.eventVersion, eventType: String(raw.eventType).slice(0, 60), hostId: String(raw.hostId).slice(0, 120), observedAt: timestamp.toISOString(), processName: String(raw.processName || "").slice(0, 160), parentProcess: String(raw.parentProcess || "").slice(0, 160), commandLine: String(raw.commandLine || "").slice(0, 500), filePath: String(raw.filePath || "").slice(0, 300), destinationIp: String(raw.destinationIp || "").slice(0, 80), destinationPort: Number.isInteger(raw.destinationPort) ? raw.destinationPort : null, username: String(raw.username || "").slice(0, 120), synthetic: true, provenance: { classification: "OBSERVATION", source: "synthetic-edr-fixture", authorization: "local-defensive-test" } };
+    const detection = detectEdrEvent(event);
+    const correlationId = `host:${event.hostId}:event:${event.eventType}`;
+    const alertId = `alert:${event.eventId}`;
+    normalized.push({ event, detection: { ...detection, alertId, correlationId, evidence: { eventId, observationId: event.observationId, requiredTelemetry: detection.requiredTelemetry } }, audit: [{ stage: "ingest", status: "complete" }, { stage: "validate", status: "complete", schema: event.eventVersion }, { stage: "normalize", status: "complete" }, { stage: "deduplicate", status: "complete" }, { stage: "correlate", status: detection.status === "detected" ? "inferred-candidate" : "no-match" }, { stage: "detect", status: detection.status }, { stage: "alert", status: detection.status === "detected" ? "created" : "not-created" }, { stage: "display", status: "complete" }] });
+  }
+  let stored = false;
+  const db = aiDb(env);
+  if (db) {
+    try {
+      const statements = [];
+      for (const item of normalized) {
+        const e = item.event; const d = item.detection; statements.push(db.prepare("INSERT OR IGNORE INTO edr_events (event_id, observation_id, event_version, event_type, observed_at, host_id, process_name, parent_process, command_line, file_path, destination_ip, destination_port, username, synthetic, provenance_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)").bind(e.eventId, e.observationId, e.eventVersion, e.eventType, e.observedAt, e.hostId, e.processName, e.parentProcess, e.commandLine, e.filePath, e.destinationIp, e.destinationPort, e.username, JSON.stringify(e.provenance))); statements.push(db.prepare("INSERT OR IGNORE INTO edr_detections (event_id, alert_id, correlation_id, rule_id, rule_version, severity, confidence, status, rationale, false_positive_notes, evidence_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(e.eventId, d.alertId, d.correlationId, d.ruleId, d.ruleVersion, d.severity, d.confidence, d.status, d.rationale, d.falsePositiveNotes, JSON.stringify(d.evidence)));
+      }
+      await db.batch(statements);
+      stored = true;
+    } catch { stored = false; }
+  }
+  return json({ ok: true, mode: db ? "d1-or-fallback" : "synthetic-local", health: db ? "PARTIALLY_OPERATIONAL" : "DEGRADED", count: normalized.length, received: events.length, processed: normalized.length, duplicates: events.length - normalized.length, rejected: 0, stored, events: normalized });
+}
+
 async function handleSourceCatalog(request, env) {
   const db = aiDb(env);
-  if (!db) return json({ error: "AI memory database not bound." }, 503);
   const q = (new URL(request.url).searchParams.get("q") || "").trim().slice(0, 120).toLowerCase();
+  if (!db) {
+    const sources = KNOWLEDGE_SEEDS.filter((item) => !q || `${item.name} ${item.category}`.toLowerCase().includes(q)).map((item) => ({ name: item.name, url: item.url, category: item.category, creator: item.creator, usage_mode: "embedded-content" }));
+    return json({ ok: true, mode: "embedded-seed", count: sources.length, sources });
+  }
   try {
     const query = q
       ? "SELECT id, name, url, category, license_status, creator, usage_mode, notes FROM ai_source_catalog WHERE lower(name) LIKE ? OR lower(category) LIKE ? ORDER BY name LIMIT 50"
@@ -415,6 +501,10 @@ const PAGE = `<!DOCTYPE html>
     <pre id="proof-output" class="proof-output" hidden></pre>
   </section>
   <section class="input-card catalog-card"><div class="lbl">Agent architecture catalog</div><p class="muted">Reference-only sources shaping retrieval, structured claims, evaluation, and observability. No upstream code is executed here.</p><div id="source-catalog" class="catalog">Loading source catalog&hellip;</div></section>
+  <section class="grid">
+    <article class="card"><h2>Evidence retrieval</h2><p class="muted">Retrieve content-bearing, provenance-labeled material from the local knowledge index. Results are context, not proof of compromise.</p><div class="row"><input id="retrieve-query" class="text-input" value="incident response" aria-label="Retrieval query"><button id="retrieve" class="cta" type="button">Retrieve content</button></div><pre id="retrieval-output" class="proof-output" hidden></pre></article>
+    <article class="card"><h2>Synthetic EDR pipeline</h2><p class="muted">Run one harmless fixture through ingest, normalization, correlation, detection, display, and audit logging. No host agent or real target is contacted.</p><button id="edr-demo" class="cta secondary" type="button">Run synthetic EDR check</button><pre id="edr-output" class="proof-output" hidden></pre></article>
+  </section>
   <section id="results" hidden>
     <div class="grid">
       <article class="card"><h2>Summary</h2><p id="summary" class="muted">—</p><p id="sentiment" class="tagline"></p></article>
@@ -443,6 +533,8 @@ main{max-width:900px;margin:0 auto;padding:32px 5vw 64px}
 .lbl{display:block;color:var(--muted);font-size:.85rem;margin-bottom:8px}
 textarea{width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:12px;font:inherit;resize:vertical}
 textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
+.text-input{min-width:0;flex:1;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:11px;font:inherit}
+.text-input:focus{outline:2px solid var(--accent);outline-offset:1px}
 .row{display:flex;align-items:center;gap:14px;margin-top:14px;flex-wrap:wrap}
 .cta{background:var(--accent);color:var(--accent-ink);border:0;border-radius:10px;padding:12px 22px;font-weight:600;font-size:1rem;cursor:pointer}
 .cta.secondary{background:var(--chip);color:var(--text);border:1px solid var(--border)}
@@ -520,6 +612,32 @@ $("proof").addEventListener("click", async () => {
   $("proof").disabled = false;
 });
 
+$("retrieve").addEventListener("click", async () => {
+  const query = $("retrieve-query").value.trim();
+  const output = $("retrieval-output");
+  if (!query) return;
+  $("retrieve").disabled = true;
+  try {
+    const res = await fetch("/api/observatory/retrieve?q=" + encodeURIComponent(query));
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Retrieval failed (" + res.status + ")");
+    output.hidden = false; output.textContent = JSON.stringify(data, null, 2);
+  } catch (e) { output.hidden = false; output.textContent = e.message; }
+  $("retrieve").disabled = false;
+});
+
+$("edr-demo").addEventListener("click", async () => {
+  const output = $("edr-output");
+  $("edr-demo").disabled = true;
+  try {
+    const res = await fetch("/api/edr/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ synthetic: true, eventId: "dashboard-fixture-" + Date.now(), eventType: "process_start", observedAt: new Date().toISOString(), hostId: "synthetic-host-01", processName: "powershell.exe", parentProcess: "outlook.exe", commandLine: "powershell -NoProfile -Command synthetic_fixture", username: "synthetic-user" }) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "EDR check failed (" + res.status + ")");
+    output.hidden = false; output.textContent = JSON.stringify(data, null, 2);
+  } catch (e) { output.hidden = false; output.textContent = e.message; }
+  $("edr-demo").disabled = false;
+});
+
 async function loadSources() {
   try {
     const res = await fetch("/api/corpora/sources");
@@ -568,6 +686,8 @@ export default {
     if (request.method === "POST" && url.pathname === "/api/corpora/ingest") return handleIngest(request, env);
     if (request.method === "GET" && url.pathname === "/api/corpora/search") return handleCorporaSearch(request, env);
     if (request.method === "GET" && url.pathname === "/api/corpora/sources") return handleSourceCatalog(request, env);
+    if (request.method === "GET" && url.pathname === "/api/observatory/retrieve") return handleKnowledgeRetrieve(request, env);
+    if (request.method === "POST" && url.pathname === "/api/edr/events") return handleEdrEvents(request, env);
     if (request.method === "POST" && url.pathname === "/api/ai/feedback") return handleFeedback(request, env);
     if (request.method === "POST" && url.pathname === "/api/observatory/proof") return handleObservatoryProof(request, env);
     return new Response("Not found", { status: 404, headers: secHeaders({ "content-type": "text/plain; charset=utf-8" }) });

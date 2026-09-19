@@ -58,6 +58,8 @@ Additional endpoints are `GET /api/corpora/sources` for the reference catalog an
 
 `POST /api/observatory/proof` accepts one provenance-bearing observation and returns a bounded proof record: normalization, correlation candidate, hypothesis, Skeptic challenge, authorized-isolated simulation plan, defensive report, and audit trail. It never executes a simulation or contacts the observation source.
 
+`GET /api/observatory/retrieve?q=incident%20response` now returns actual content-bearing, provenance-labeled passages from the D1 knowledge-document index or the embedded seed fallback. `POST /api/edr/events` accepts only synthetic, versioned fixtures such as `edr.process.v1`; it validates, hashes, deduplicates, detects, records confidence separately from severity, and returns the complete audit path. Invalid events are rejected with a reason and rejection identifier. The endpoint never collects from a real host or executes commands.
+
 The external knowledge seed is deliberately curated around [MITRE ATT&CK](https://attack.mitre.org/), [NIST SP 800-61](https://csrc.nist.gov/pubs/sp/800/61/r2/final), [NIST SP 800-115](https://csrc.nist.gov/pubs/sp/800/115/final), the [CISA KEV Catalog](https://www.cisa.gov/known-exploited-vulnerabilities-catalog), and the existing malware/CTI reference sources. These are provenance-bearing references, not an undifferentiated blog dump and not executable instructions.
 
 ## Wrangler release hardening

@@ -238,3 +238,14 @@ The smallest meaningful next slice is one synthetic telemetry type, preferably a
 [3]: https://csrc.nist.gov/pubs/sp/800/115/final "NIST SP 800-115 technical security testing guidance"
 [4]: https://www.cisa.gov/known-exploited-vulnerabilities-catalog "CISA Known Exploited Vulnerabilities Catalog"
 [5]: https://developers.cloudflare.com/workers/ "Cloudflare Workers documentation"
+
+
+## EDR hardening slice added after the initial audit
+
+The repository now includes a content-bearing, synthetic-only EDR control-plane slice. It accepts explicitly versioned fixtures such as `edr.process.v1`, rejects unsupported versions and mismatched event types, validates timestamps and required fields, creates a separate observation hash, deduplicates event IDs in the local preview, and uses D1 uniqueness constraints for durable deduplication when D1 is available. Invalid fixtures return `REJECTED` with a reason and a rejection identifier; a D1-backed deployment also records the hashed rejection in `edr_rejections`.
+
+The detection record separates rule version, severity, confidence, alert ID, correlation ID, rationale, false-positive notes, and supporting evidence. The no-match state is `no-threat-observed`, not `no-threat`. The returned health state is `DEGRADED` for the stateless preview and `PARTIALLY_OPERATIONAL` when a D1 binding is present; application uptime alone is not treated as healthy EDR.
+
+The retrieval path now returns actual content from the embedded seed corpus when D1 is unavailable and queries `ai_knowledge_documents` when D1 is available. The dashboard exposes both retrieval results and the synthetic EDR pipeline output. The embedded content is provenance-labeled and reference-only. The endpoint-security projects listed in the supplied hardening note are credited in [UPSTREAM-CREDITS.md](UPSTREAM-CREDITS.md); no upstream code or runtime dependency was copied.
+
+The hardening slice was smoke-tested with a suspicious synthetic process event, a benign synthetic process event, an unsupported-version rejection, content retrieval for NIST incident response, and source-catalog content. It remains **PARTIAL** as an EDR system because no osquery, OpenEDR, OpenDR, Falco, or other endpoint collector is installed or connected, and no live endpoint telemetry is collected.

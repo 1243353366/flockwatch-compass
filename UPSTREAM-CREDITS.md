@@ -46,3 +46,15 @@ The following names came from the supplied research handoff and are retained as 
 ## Attribution standard
 
 Where upstream code, rules, data, or documentation is ever incorporated, the change must identify the exact upstream version, creator, license, copyright notice, files affected, and any modifications. Unlicensed or unclear material remains reference-only. The system’s defensive boundary is explicit: evidence can support analysis, but it does not authorize intrusion, retaliation, live-malware execution, unauthorized scanning, or unsupported legal or actor-attribution conclusions.
+
+
+## Endpoint telemetry and runtime-detection references
+
+| Upstream | Creator / maintainer | Design contribution | Credit / license handling |
+|---|---|---|---|
+| [osquery](https://github.com/osquery/osquery) | [@osquery](https://github.com/osquery) | Cross-platform endpoint observation model for processes, users, network connections, and hashes | Reference-only; no osquery code or collector is bundled. Review the upstream Apache-2.0 license before reuse. |
+| [OpenEDR](https://github.com/ComodoSecurity/openedr) | [@ComodoSecurity](https://github.com/ComodoSecurity) | EDR architecture covering process, filesystem, network, registry, and self-protection concerns | Reference-only; no OpenEDR code is bundled. Preserve upstream notices if code is ever imported. |
+| [OpenDR](https://github.com/opendr-io/opendr) | [@opendr-io](https://github.com/opendr-io) | Lightweight endpoint-sensor and telemetry design reference | Reference-only; no sensor is bundled. Verify the repository license before reuse. |
+| [Falco](https://github.com/falcosecurity/falco) | [@falcosecurity](https://github.com/falcosecurity) | Runtime behavioral detection and syscall-oriented telemetry reference | Reference-only; no Falco rules or runtime are executed by this Worker. |
+
+The current EDR implementation uses synthetic fixtures to prove the control-plane path. These references informed event-versioning, stable identity, provenance, detection prerequisites, and explicit degraded health; they do not make endpoint collection available.
