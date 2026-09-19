@@ -35,3 +35,27 @@ npx wrangler deploy
 
 Zero npm dependencies. Strict CSP, rate limiting, dark-mode-first UI.
 Model: `@cf/openai/gpt-oss-20b` (Workers AI) with `max_tokens: 2048`.
+
+
+## Observatory reasoning layer
+
+Corpora AI now maintains a **catalogue and evaluation layer** for the Observatory reasoning stack. The catalog records LangGraph, smolagents, DSPy, PydanticAI, LlamaIndex, Haystack, Agno, AutoGen/AG2, BeeAI Framework, and OpenLLMetry as reference sources with URLs, creators, intended role, and license-review status. The catalog is not a claim that their code or model weights have been imported.
+
+The intended reasoning chain is:
+
+```text
+raw evidence → normalized observation → retrieved corroboration → hypothesis
+→ counter-hypothesis → confidence → human/verification gate → conclusion
+```
+
+The Worker does **not** silently “train itself.” When the user opts in, it stores an evaluation run’s output metadata and structured claims in additive `ai_runs` and `ai_claims` tables. Authorized reviewers can submit labels through `/api/ai/feedback`; these labels form a regression/evaluation corpus and do not update model weights or grant the Worker new permissions.
+
+## AI memory schema
+
+`schema-corpora.sql` now creates `ai_source_catalog`, `ai_documents`, `ai_runs`, `ai_claims`, and `ai_feedback` alongside the existing `corpora` table. Raw input is not stored by `/api/analyze`; persistence is opt-in and stores only output metadata, claims, confidence, and provenance. The Worker uses the existing `DB` binding as a safe fallback because creation of a separate Cloudflare D1 database requires account authorization that was unavailable during this release. A future `AI_DB` binding can be added without changing the API contract.
+
+Additional endpoints are `GET /api/corpora/sources` for the reference catalog and authenticated `POST /api/ai/feedback` for labels (`accepted`, `needs-review`, `unsupported`, or `incorrect`). The health response reports the active model and whether the AI-memory binding is available.
+
+## Wrangler release hardening
+
+The canonical `wrangler.toml` now declares Node 22-compatible Workers support, `nodejs_compat`, minification, disabled anonymous Wrangler metrics, and Workers observability. GitHub Actions uses Node 22, installs Wrangler 4 explicitly, applies the additive D1 schema, and deploys only after the schema step succeeds. The schema is idempotent and uses `CREATE TABLE IF NOT EXISTS` / `INSERT OR IGNORE` for safe replay.

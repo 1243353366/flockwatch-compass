@@ -124,7 +124,28 @@ async function handleAnalyze(request, env) {
   if (text.length > MAX_BYTES) return json({ error: "Corpus too large: 32KB max." }, 413);
   const algo = analyzeText(text);
   const ai = await aiAnalyze(env, text);
-  return json({ ok: true, mode: ai ? "ai+algorithmic" : "algorithmic", ...algo, ai });
+  const result = { ok: true, mode: ai ? "ai+algorithmic" : "algorithmic", ...algo, ai };
+  if (body.persist === true) result.runId = await persistAnalysis(env, result, text.length);
+  return json(result);
+}
+
+function aiDb(env) { return env.AI_DB || env.DB; }
+
+async function persistAnalysis(env, result, inputChars) {
+  const db = aiDb(env);
+  if (!db) return null;
+  const requestId = crypto.randomUUID();
+  const output = JSON.stringify({ summary: result.ai && result.ai.summary, topics: result.ai && result.ai.topics || [], entities: result.ai && result.ai.entities || [], algorithmic: result.stats });
+  try {
+    const inserted = await db.prepare("INSERT INTO ai_runs (request_id, mode, model, input_chars, output_json, confidence) VALUES (?, ?, ?, ?, ?, ?)")
+      .bind(requestId, result.mode, result.ai ? AI_MODEL : "algorithmic", inputChars, output, result.ai ? 0.5 : null).run();
+    const runId = inserted.meta && inserted.meta.last_row_id;
+    if (runId && result.ai && result.ai.summary) {
+      await db.prepare("INSERT INTO ai_claims (run_id, claim, claim_type, evidence_json, confidence, verification_status) VALUES (?, ?, ?, ?, ?, ?)")
+        .bind(runId, result.ai.summary.slice(0, 1200), "summary", JSON.stringify(result.ai.entities || []), 0.5, "unverified").run();
+    }
+    return runId || requestId;
+  } catch { return null; }
 }
 
 /* ---------- corpora intelligence index (shared D1: blog_db) ---------- */
@@ -178,6 +199,38 @@ async function handleCorporaSearch(request, env) {
   }
 }
 
+async function handleSourceCatalog(request, env) {
+  const db = aiDb(env);
+  if (!db) return json({ error: "AI memory database not bound." }, 503);
+  const q = (new URL(request.url).searchParams.get("q") || "").trim().slice(0, 120).toLowerCase();
+  try {
+    const query = q
+      ? "SELECT id, name, url, category, license_status, creator, usage_mode, notes FROM ai_source_catalog WHERE lower(name) LIKE ? OR lower(category) LIKE ? ORDER BY name LIMIT 50"
+      : "SELECT id, name, url, category, license_status, creator, usage_mode, notes FROM ai_source_catalog ORDER BY name LIMIT 50";
+    const params = q ? [`%${q}%`, `%${q}%`] : [];
+    const { results } = await db.prepare(query).bind(...params).all();
+    return json({ ok: true, count: results.length, sources: results });
+  } catch { return json({ error: "Source catalog is not initialized." }, 500); }
+}
+
+async function handleFeedback(request, env) {
+  const token = env.AI_FEEDBACK_TOKEN || env.INGEST_TOKEN;
+  if (!token) return json({ error: "Feedback is not configured on this worker." }, 503);
+  if (request.headers.get("Authorization") !== "Bearer " + token) return json({ error: "Unauthorized." }, 401);
+  const db = aiDb(env);
+  if (!db) return json({ error: "AI memory database not bound." }, 503);
+  let body;
+  try { body = await request.json(); } catch { return json({ error: "Invalid JSON body." }, 400); }
+  const runId = Number(body.runId);
+  const label = typeof body.label === "string" ? body.label.trim().slice(0, 40) : "";
+  const notes = typeof body.notes === "string" ? body.notes.trim().slice(0, 1000) : "";
+  if (!Number.isInteger(runId) || runId < 1 || !["accepted", "needs-review", "unsupported", "incorrect"].includes(label)) return json({ error: "runId and a supported label are required." }, 400);
+  try {
+    await db.prepare("INSERT INTO ai_feedback (run_id, label, notes) VALUES (?, ?, ?)").bind(runId, label, notes).run();
+    return json({ ok: true, runId, label });
+  } catch { return json({ error: "Feedback insert failed." }, 500); }
+}
+
 /* ---------- assets ---------- */
 
 const PAGE = `<!DOCTYPE html>
@@ -202,11 +255,13 @@ const PAGE = `<!DOCTYPE html>
   <section class="input-card">
     <label class="lbl" for="input">Your text corpus (up to 32KB)</label>
     <textarea id="input" rows="8" placeholder="Paste an article, a report, a thread, research notes&hellip;"></textarea>
+    <label class="consent"><input id="persist" type="checkbox"> Save an evaluation case for human review (stores output metadata, not raw text)</label>
     <div class="row">
       <button id="analyze" class="cta" type="button">Analyze corpus</button>
       <span id="msg" class="msg" role="status" aria-live="polite"></span>
     </div>
   </section>
+  <section class="input-card catalog-card"><div class="lbl">Agent architecture catalog</div><p class="muted">Reference-only sources shaping retrieval, structured claims, evaluation, and observability. No upstream code is executed here.</p><div id="source-catalog" class="catalog">Loading source catalog&hellip;</div></section>
   <section id="results" hidden>
     <div class="grid">
       <article class="card"><h2>Summary</h2><p id="summary" class="muted">—</p><p id="sentiment" class="tagline"></p></article>
@@ -216,7 +271,7 @@ const PAGE = `<!DOCTYPE html>
     </div>
   </section>
 </main>
-<footer><p>Corpora AI &middot; part of Aadi&rsquo;s Digital Lab &middot; no accounts, no storage, analysis is stateless</p></footer>
+<footer><p>Corpora AI &middot; part of Aadi&rsquo;s Digital Lab &middot; opt-in evaluation memory only &middot; raw input is not stored by default</p></footer>
 </body>
 </html>`;
 
@@ -238,6 +293,9 @@ textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
 .cta{background:var(--accent);color:var(--accent-ink);border:0;border-radius:10px;padding:12px 22px;font-weight:600;font-size:1rem;cursor:pointer}
 .cta:disabled{opacity:.55;cursor:wait}
 .msg{color:var(--muted);font-size:.9rem}
+.consent{display:flex;gap:8px;align-items:flex-start;color:var(--muted);font-size:.82rem;margin-top:12px}
+.consent input{accent-color:var(--accent);margin-top:5px}
+.catalog-card{margin-top:18px}.catalog{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}.source{background:var(--chip);border:1px solid var(--border);border-radius:10px;padding:10px}.source a{color:var(--text);font-weight:600;text-decoration:none}.source small{display:block;color:var(--muted);font-size:.75rem;margin-top:3px}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
 .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;min-width:0}
 .card h2{font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 12px}
@@ -277,14 +335,24 @@ $("analyze").addEventListener("click", async () => {
   if (!text) { msg.textContent = "Paste or type some text first."; return; }
   $("analyze").disabled = true; msg.textContent = "Analyzing corpus…";
   try {
-    const res = await fetch("/api/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
+    const res = await fetch("/api/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, persist: $("persist").checked }) });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Analysis failed (" + res.status + ")");
     render(data);
-    msg.textContent = data.mode === "ai+algorithmic" ? "Analyzed with Workers AI + algorithmic pass." : "Analyzed in algorithmic mode (AI unavailable right now).";
+    msg.textContent = data.runId ? "Analyzed and saved as evaluation run " + data.runId + "." : (data.mode === "ai+algorithmic" ? "Analyzed with Workers AI + algorithmic pass." : "Analyzed in algorithmic mode (AI unavailable right now).");
   } catch (e) { msg.textContent = e.message; }
   $("analyze").disabled = false;
 });
+
+async function loadSources() {
+  try {
+    const res = await fetch("/api/corpora/sources");
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Catalog unavailable");
+    $("source-catalog").innerHTML = data.sources.map((s) => '<div class="source"><a href="' + esc(s.url) + '" target="_blank" rel="noreferrer">' + esc(s.name) + '</a><small>' + esc(s.category) + ' · ' + esc(s.creator) + '</small></div>').join("");
+  } catch (e) { $("source-catalog").textContent = "Source catalog unavailable until the D1 schema is applied."; }
+}
+loadSources();
 
 function render(d) {
   $("results").hidden = false;
@@ -311,11 +379,13 @@ export default {
       if (url.pathname === "/" || url.pathname === "/index.html") return asset(PAGE, "text/html; charset=utf-8");
       if (url.pathname === "/style.css") return asset(PAGE_CSS, "text/css; charset=utf-8");
       if (url.pathname === "/app.js") return asset(PAGE_JS, "application/javascript; charset=utf-8");
-      if (url.pathname === "/health") return json({ ok: true, service: "corpora-ai", mode: env.AI ? "ai+algorithmic" : "algorithmic", corporaDb: !!env.DB });
+      if (url.pathname === "/health") return json({ ok: true, service: "corpora-ai", mode: env.AI ? "ai+algorithmic" : "algorithmic", corporaDb: !!env.DB, aiMemoryDb: !!aiDb(env), model: AI_MODEL });
     }
     if (request.method === "POST" && url.pathname === "/api/analyze") return handleAnalyze(request, env);
     if (request.method === "POST" && url.pathname === "/api/corpora/ingest") return handleIngest(request, env);
     if (request.method === "GET" && url.pathname === "/api/corpora/search") return handleCorporaSearch(request, env);
+    if (request.method === "GET" && url.pathname === "/api/corpora/sources") return handleSourceCatalog(request, env);
+    if (request.method === "POST" && url.pathname === "/api/ai/feedback") return handleFeedback(request, env);
     return new Response("Not found", { status: 404, headers: secHeaders({ "content-type": "text/plain; charset=utf-8" }) });
   },
 };

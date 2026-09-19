@@ -40,3 +40,23 @@ Aadi's Digital Lab seeds (repository metadata, research notes, launch log)
 and the corpus research policy record are original Lab content.
 
 All corpus material is for ethical research use only - a research tool.
+
+
+## Observatory agent-architecture references
+
+The following projects were supplied as architecture references for the agentic-reasoning layer. Corpora AI stores their public URLs and intended roles as catalogue metadata; it does not copy their source code, execute their tools, or redistribute their models. License status is therefore recorded conservatively and must be re-verified against the exact version before any future code integration.
+
+| Project | Creator / organization | Role in the architecture | License handling |
+|---|---|---|---|
+| [LangGraph](https://github.com/langchain-ai/langgraph) | LangChain AI / `@langchain-ai` | Stateful agent orchestration | Catalogue-only; verify upstream license before reuse. |
+| [smolagents](https://github.com/huggingface/smolagents) | Hugging Face / `@huggingface` | Controlled tool reasoning | Catalogue-only; no tool execution enabled here. |
+| [DSPy](https://github.com/stanfordnlp/dspy) | Stanford NLP / `@stanfordnlp` | Measurable reasoning/prompt optimization | Catalogue-only; verify upstream license before reuse. |
+| [PydanticAI](https://github.com/pydantic/pydantic-ai) | Pydantic / `@pydantic` | Structured claims and typed outputs | Catalogue-only; verify upstream license before reuse. |
+| [LlamaIndex](https://github.com/run-llama/llama_index) | LlamaIndex / `@run-llama` | Evidence retrieval and indexing | Catalogue-only; verify upstream license before reuse. |
+| [Haystack](https://github.com/deepset-ai/haystack) | deepset / `@deepset-ai` | Explicit retrieval pipelines | Catalogue-only; verify upstream license before reuse. |
+| [Agno](https://github.com/agno-agi/agno) | Agno / `@agno-agi` | Agent teams, memory, and tools | Catalogue-only; verify upstream license before reuse. |
+| [AutoGen / AG2](https://github.com/microsoft/autogen) | Microsoft / `@microsoft` | Multi-agent review and delegation | Catalogue-only; verify upstream license before reuse. |
+| [BeeAI Framework](https://github.com/i-am-bee/bee-agent-framework) | BeeAI / `@i-am-bee` | Agent workflows and structured tools | Catalogue-only; verify upstream license before reuse. |
+| [OpenLLMetry](https://github.com/traceloop/openllmetry) | Traceloop / `@traceloop` | Agent-run and tool-call observability | Catalogue-only; verify upstream license before reuse. |
+
+The reference boundary is deliberate: raw evidence must become normalized observations and retrieved corroboration before the system produces hypotheses or conclusions. No source in this table grants permission to attack real systems, execute arbitrary tools, or bypass authorization.
