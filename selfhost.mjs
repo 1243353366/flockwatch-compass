@@ -8,6 +8,7 @@ const env = {
   AI_DB: null,
   INGEST_TOKEN: process.env.INGEST_TOKEN || "",
   AI_FEEDBACK_TOKEN: process.env.AI_FEEDBACK_TOKEN || "",
+  AI_MEMORY_ENCRYPTION_KEY: process.env.AI_MEMORY_ENCRYPTION_KEY || "",
 };
 
 const server = createServer(async (incoming, outgoing) => {

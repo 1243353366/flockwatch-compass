@@ -87,3 +87,20 @@ INSERT OR IGNORE INTO ai_source_catalog (name, url, category, creator, notes) VA
 ('AutoGen / AG2', 'https://github.com/microsoft/autogen', 'multi-agent review', 'Microsoft / @microsoft', 'Debate, delegation, review, and termination-condition reference.'),
 ('BeeAI Framework', 'https://github.com/i-am-bee/bee-agent-framework', 'agent workflows', 'BeeAI / @i-am-bee', 'Workflow, tool, memory, and structured-agent reference.'),
 ('OpenLLMetry', 'https://github.com/traceloop/openllmetry', 'observability', 'Traceloop / @traceloop', 'Tracing and evaluation observability reference for agent runs.');
+
+
+-- Curated defensive knowledge seeds. These are provenance-bearing references,
+-- not claims that content, malware, or executable tooling was imported.
+INSERT OR IGNORE INTO ai_source_catalog (name, url, category, creator, usage_mode, notes) VALUES
+('MITRE ATT&CK', 'https://attack.mitre.org/', 'behavior vocabulary', 'The MITRE Corporation / @mitre-attack', 'reference-only', 'Tactics, techniques, software, groups, and defensive mappings.'),
+('MITRE ATT&CK STIX Data', 'https://github.com/mitre-attack/attack-stix-data', 'structured threat knowledge', 'The MITRE Corporation / @mitre-attack', 'reference-only', 'Versioned ATT&CK objects with provenance and relationships.'),
+('NIST SP 800-61 Rev. 2', 'https://csrc.nist.gov/pubs/sp/800/61/r2/final', 'incident response', 'NIST / @NIST', 'reference-only', 'Incident-response lifecycle and handling guidance.'),
+('NIST SP 800-115', 'https://csrc.nist.gov/pubs/sp/800/115/final', 'security testing', 'NIST / @NIST', 'reference-only', 'Planning and conducting authorized technical security tests.'),
+('CISA Known Exploited Vulnerabilities Catalog', 'https://www.cisa.gov/known-exploited-vulnerabilities-catalog', 'vulnerability intelligence', 'CISA / @CISA', 'reference-only', 'Publicly listed exploited vulnerabilities and remediation prioritization.'),
+('MalwareBazaar', 'https://bazaar.abuse.ch/', 'malware intelligence', 'abuse.ch', 'reference-only', 'Sample metadata and indicators; no samples are downloaded or executed here.'),
+('ThreatFox', 'https://threatfox.abuse.ch/', 'indicator intelligence', 'abuse.ch', 'reference-only', 'IOC relationships and sightings with source provenance.'),
+('URLhaus', 'https://urlhaus.abuse.ch/', 'malicious URL intelligence', 'abuse.ch', 'reference-only', 'Malicious URL metadata; no external retrieval is performed by the proof path.'),
+('YARAify', 'https://yaraify.abuse.ch/', 'malware rule intelligence', 'abuse.ch', 'reference-only', 'Rule and scan context; no live sample execution.'),
+('ANY.RUN public reports', 'https://any.run/', 'sandbox reports', 'ANY.RUN', 'reference-only', 'Public analysis reports used as secondary evidence only.'),
+('CAPE Sandbox', 'https://github.com/kevoreilly/capemon', 'sandbox analysis', 'CAPE contributors / @kevoreilly', 'reference-only', 'Sandbox methodology reference; not invoked by this Worker.'),
+('VX-Underground', 'https://vx-underground.org/', 'malware research archive', 'VX-Underground', 'reference-only', 'Research archive reference; no samples are bundled or executed.');

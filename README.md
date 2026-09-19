@@ -56,6 +56,10 @@ The Worker does **not** silently “train itself.” When the user opts in, it s
 
 Additional endpoints are `GET /api/corpora/sources` for the reference catalog and authenticated `POST /api/ai/feedback` for labels (`accepted`, `needs-review`, `unsupported`, or `incorrect`). The health response reports the active model and whether the AI-memory binding is available.
 
+`POST /api/observatory/proof` accepts one provenance-bearing observation and returns a bounded proof record: normalization, correlation candidate, hypothesis, Skeptic challenge, authorized-isolated simulation plan, defensive report, and audit trail. It never executes a simulation or contacts the observation source.
+
+The external knowledge seed is deliberately curated around [MITRE ATT&CK](https://attack.mitre.org/), [NIST SP 800-61](https://csrc.nist.gov/pubs/sp/800/61/r2/final), [NIST SP 800-115](https://csrc.nist.gov/pubs/sp/800/115/final), the [CISA KEV Catalog](https://www.cisa.gov/known-exploited-vulnerabilities-catalog), and the existing malware/CTI reference sources. These are provenance-bearing references, not an undifferentiated blog dump and not executable instructions.
+
 ## Wrangler release hardening
 
 The canonical `wrangler.toml` now declares Node 24-compatible Workers support, `nodejs_compat`, minification, disabled anonymous Wrangler metrics, and Workers observability. GitHub Actions uses Node 24 LTS, installs Wrangler 4 explicitly, applies the additive D1 schema, and deploys only after the schema step succeeds. The schema is idempotent and uses `CREATE TABLE IF NOT EXISTS` / `INSERT OR IGNORE` for safe replay.
@@ -70,6 +74,15 @@ PORT=8787 node selfhost.mjs
 ```
 
 The adapter serves the same Worker routes on `0.0.0.0` and safely falls back to algorithmic analysis when Workers AI and D1 bindings are not supplied. For production self-hosting, provide a compatible AI/D1 adapter or use the manual Wrangler workflow; do not expose ingestion or feedback tokens in client code.
+
+For encrypted proof persistence, generate a 32-byte base64 key and set it only as a server-side secret:
+
+```sh
+export AI_MEMORY_ENCRYPTION_KEY="$(openssl rand -base64 32)"
+PORT=8787 node selfhost.mjs
+```
+
+When D1 and the key are both present, proof records and proof claims are stored as **AES-256-GCM** ciphertext. The key is never returned by `/health` or sent to the browser. Without the key, proof persistence fails closed rather than writing plaintext.
 
 The repository declares `engines.node` as `>=24.0.0 <25.0.0`, includes `.nvmrc`, and pins Wrangler in `package-lock.json`. There is no Dockerfile in this repository; no Docker runtime change was necessary.
 

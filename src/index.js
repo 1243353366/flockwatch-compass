@@ -71,6 +71,23 @@ function analyzeText(text) {
   };
 }
 
+function skepticReview(text, algo, ai) {
+  const lower = text.toLowerCase();
+  const contradictionMarkers = ["however", "but", "although", "contradict", "conflict", "dispute", "unknown", "unconfirmed"];
+  const markers = contradictionMarkers.filter((marker) => lower.includes(marker));
+  const explicitUncertainty = markers.some((marker) => ["unknown", "unconfirmed", "dispute", "conflict"].includes(marker));
+  const claims = ai && ai.summary ? [ai.summary] : (algo.keywords || []).slice(0, 3).map((item) => item.term);
+  return {
+    status: explicitUncertainty ? "conflicting_or_uncertain" : "review_required",
+    hypothesis: claims.length ? "The available text supports a preliminary observation, not a verified causal or attribution claim." : "No supported hypothesis can be formed from the available text.",
+    alternativeHypothesis: "The observed pattern may reflect benign, shared, delayed, or independently caused activity rather than the leading interpretation.",
+    contradictionSignals: markers,
+    missingEvidence: ["primary telemetry", "independent corroboration", "observed and collected timestamps"],
+    negativeEvidenceGuard: "not_observed_is_not_observed_absence",
+    nextQuestion: "What independent evidence would distinguish the leading hypothesis from the alternative?",
+  };
+}
+
 /* ---------- Workers AI pass ---------- */
 
 async function aiAnalyze(env, text, onErr) {
@@ -124,7 +141,8 @@ async function handleAnalyze(request, env) {
   if (text.length > MAX_BYTES) return json({ error: "Corpus too large: 32KB max." }, 413);
   const algo = analyzeText(text);
   const ai = await aiAnalyze(env, text);
-  const result = { ok: true, mode: ai ? "ai+algorithmic" : "algorithmic", ...algo, ai };
+  const skeptic = skepticReview(text, algo, ai);
+  const result = { ok: true, mode: ai ? "ai+algorithmic" : "algorithmic", ...algo, ai, skeptic };
   if (body.persist === true) result.runId = await persistAnalysis(env, result, text.length);
   return json(result);
 }
@@ -135,7 +153,7 @@ async function persistAnalysis(env, result, inputChars) {
   const db = aiDb(env);
   if (!db) return null;
   const requestId = crypto.randomUUID();
-  const output = JSON.stringify({ summary: result.ai && result.ai.summary, topics: result.ai && result.ai.topics || [], entities: result.ai && result.ai.entities || [], algorithmic: result.stats });
+  const output = JSON.stringify({ summary: result.ai && result.ai.summary, topics: result.ai && result.ai.topics || [], entities: result.ai && result.ai.entities || [], algorithmic: result.stats, skeptic: result.skeptic });
   try {
     const inserted = await db.prepare("INSERT INTO ai_runs (request_id, mode, model, input_chars, output_json, confidence) VALUES (?, ?, ?, ?, ?, ?)")
       .bind(requestId, result.mode, result.ai ? AI_MODEL : "algorithmic", inputChars, output, result.ai ? 0.5 : null).run();
@@ -231,6 +249,139 @@ async function handleFeedback(request, env) {
   } catch { return json({ error: "Feedback insert failed." }, 500); }
 }
 
+async function sha256(value) {
+  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(bytes)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function base64Bytes(bytes) {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+async function encryptionKey(env) {
+  const encoded = typeof env.AI_MEMORY_ENCRYPTION_KEY === "string" ? env.AI_MEMORY_ENCRYPTION_KEY : "";
+  if (!encoded) return null;
+  let raw;
+  try {
+    const binary = atob(encoded);
+    raw = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  } catch { return null; }
+  if (raw.length !== 32) return null;
+  return crypto.subtle.importKey("raw", raw, { name: "AES-GCM" }, false, ["encrypt"]);
+}
+
+async function encryptForStorage(env, value) {
+  const key = await encryptionKey(env);
+  if (!key) return null;
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(value));
+  return `aes-256-gcm:v1:${base64Bytes(iv)}:${base64Bytes(new Uint8Array(ciphertext))}`;
+}
+
+function normalizeEntity(value) {
+  return String(value || "").trim().toLowerCase().replace(/\[\.\]/g, ".").replace(/\s+/g, " ");
+}
+
+async function persistProof(env, proof) {
+  const db = aiDb(env);
+  if (!db || !(await encryptionKey(env))) return null;
+  const requestId = crypto.randomUUID();
+  try {
+    const encrypted = await encryptForStorage(env, JSON.stringify(proof));
+    if (!encrypted) return null;
+    const inserted = await db.prepare("INSERT INTO ai_runs (request_id, mode, model, input_chars, output_json, confidence) VALUES (?, ?, ?, ?, ?, ?)")
+      .bind(requestId, "observatory-proof", "algorithmic-skeptic-v1+a256gcm", proof.observation.details.length, encrypted, proof.assessment.confidence).run();
+    const runId = inserted.meta && inserted.meta.last_row_id;
+    if (runId) {
+      await db.prepare("INSERT INTO ai_claims (run_id, claim, claim_type, evidence_json, confidence, verification_status) VALUES (?, ?, ?, ?, ?, ?)")
+        .bind(runId, "Encrypted observatory proof; decrypt through an authorized dashboard path.", "encrypted-hypothesis", encrypted, proof.assessment.confidence, "requires-human-review").run();
+    }
+    return runId || requestId;
+  } catch { return null; }
+}
+
+async function handleObservatoryProof(request, env) {
+  const ip = request.headers.get("cf-connecting-ip") || "unknown";
+  if (rateLimited("proof:" + ip)) return json({ error: "Rate limit: 10 proof runs per minute." }, 429);
+  let body;
+  try { body = await request.json(); } catch { return json({ error: "Invalid JSON body." }, 400); }
+  const source = body && body.source && typeof body.source === "object" ? body.source : {};
+  const entity = body && body.entity && typeof body.entity === "object" ? body.entity : {};
+  const signal = typeof body.signal === "string" ? body.signal.trim().slice(0, 500) : "";
+  const details = typeof body.details === "string" ? body.details.trim().slice(0, 8000) : "";
+  const observedAt = typeof body.observedAt === "string" ? body.observedAt : "";
+  if (!source.name || !source.url || !entity.value || !signal || !observedAt || !details) {
+    return json({ error: "source.name, source.url, entity.value, signal, observedAt, and details are required." }, 400);
+  }
+  let sourceUrl;
+  let timestamp;
+  try { sourceUrl = new URL(String(source.url)); timestamp = new Date(observedAt); } catch { return json({ error: "source.url or observedAt is invalid." }, 400); }
+  if (!["http:", "https:"].includes(sourceUrl.protocol) || Number.isNaN(timestamp.getTime())) return json({ error: "Use an http(s) source URL and valid observedAt timestamp." }, 400);
+  const observation = {
+    classification: "OBSERVATION",
+    source: { name: String(source.name).slice(0, 160), url: sourceUrl.toString(), license: String(source.license || "verify upstream terms").slice(0, 160) },
+    entity: { value: String(entity.value).slice(0, 240), normalized: normalizeEntity(entity.value), type: String(entity.type || "unknown").slice(0, 60) },
+    signal,
+    details,
+    observedAt: timestamp.toISOString(),
+  };
+  const evidenceHash = await sha256(JSON.stringify(observation));
+  const correlation = {
+    status: "possibly_related",
+    key: observation.entity.normalized,
+    matches: [{ field: "normalized_entity", value: observation.entity.normalized, relationship: "same_entity_candidate" }],
+    caveat: "Correlation is not attribution; independent evidence is required before merging entities.",
+  };
+  const skeptic = {
+    classification: "HYPOTHESIS",
+    challenge: "The signal may reflect benign, shared, delayed, or independently caused activity rather than the leading interpretation.",
+    contradictingEvidenceNeeded: ["primary telemetry", "independent corroboration", "collection and observed timestamps"],
+    negativeEvidenceGuard: "not_observed_is_not_observed_absence",
+    status: "requires_human_review",
+  };
+  const simulationAuthorized = body.authorizationConfirmed === true && body.simulationMode === "benign-isolated";
+  const simulation = {
+    classification: "SIMULATION_RESULT",
+    status: simulationAuthorized ? "plan_ready_no_execution" : "blocked_pending_authorization_and_isolation",
+    scope: "synthetic target only",
+    steps: ["identify behavior", "define telemetry", "verify isolation", "run benign emulation", "test detection", "test containment", "restore", "verify recovery"],
+    executed: false,
+  };
+  const proof = {
+    version: "observatory-proof-v1",
+    observation: { ...observation, evidenceHash },
+    correlation,
+    assessment: {
+      classification: "HYPOTHESIS",
+      hypothesis: `The observed ${observation.signal} may be associated with ${observation.entity.value}, but the evidence is insufficient for attribution.`,
+      alternative: skeptic.challenge,
+      confidence: 0.35,
+      status: "requires_human_review",
+    },
+    skeptic,
+    simulation,
+    report: {
+      summary: "One provenance-bearing observation was normalized and correlated, then challenged without forcing attribution.",
+      unknowns: ["independent corroboration", "complete telemetry coverage", "operator attribution"],
+      mitigation: ["preserve evidence", "validate timestamps", "apply reversible detection and containment controls only after authorization"],
+      legalGovernance: "LEGAL_REVIEW_RECOMMENDED before testing third-party infrastructure or handling personal data.",
+    },
+    auditTrail: [
+      { stage: "ingest", status: "complete", evidenceHash },
+      { stage: "normalize", status: "complete", entity: observation.entity.normalized },
+      { stage: "correlate", status: "complete", result: correlation.status },
+      { stage: "hypothesize", status: "complete", classification: "HYPOTHESIS" },
+      { stage: "skeptic", status: "complete", result: skeptic.status },
+      { stage: "simulate", status: simulation.status, executed: false },
+      { stage: "report", status: "complete", requiresHumanReview: true },
+    ],
+  };
+  proof.auditId = await persistProof(env, proof);
+  return json({ ok: true, proof });
+}
+
 /* ---------- assets ---------- */
 
 const PAGE = `<!DOCTYPE html>
@@ -258,8 +409,10 @@ const PAGE = `<!DOCTYPE html>
     <label class="consent"><input id="persist" type="checkbox"> Save an evaluation case for human review (stores output metadata, not raw text)</label>
     <div class="row">
       <button id="analyze" class="cta" type="button">Analyze corpus</button>
+      <button id="proof" class="cta secondary" type="button">Run bounded proof</button>
       <span id="msg" class="msg" role="status" aria-live="polite"></span>
     </div>
+    <pre id="proof-output" class="proof-output" hidden></pre>
   </section>
   <section class="input-card catalog-card"><div class="lbl">Agent architecture catalog</div><p class="muted">Reference-only sources shaping retrieval, structured claims, evaluation, and observability. No upstream code is executed here.</p><div id="source-catalog" class="catalog">Loading source catalog&hellip;</div></section>
   <section id="results" hidden>
@@ -268,6 +421,7 @@ const PAGE = `<!DOCTYPE html>
       <article class="card"><h2>Topics</h2><div id="topics" class="chips"></div><h2 class="mt">Entities</h2><div id="entities" class="chips"></div></article>
       <article class="card"><h2>Key terms</h2><div id="keywords" class="bars"></div></article>
       <article class="card"><h2>Corpus stats</h2><div id="stats" class="tiles"></div><p class="tagline" id="readability"></p></article>
+      <article class="card skeptic-card"><h2>Skeptic review</h2><p id="skeptic-status" class="tagline"></p><p id="skeptic-hypothesis" class="muted"></p><p id="skeptic-alternative" class="muted"></p><p id="skeptic-missing" class="muted"></p><p id="skeptic-next" class="muted"></p></article>
     </div>
   </section>
 </main>
@@ -291,6 +445,7 @@ textarea{width:100%;background:var(--bg);color:var(--text);border:1px solid var(
 textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
 .row{display:flex;align-items:center;gap:14px;margin-top:14px;flex-wrap:wrap}
 .cta{background:var(--accent);color:var(--accent-ink);border:0;border-radius:10px;padding:12px 22px;font-weight:600;font-size:1rem;cursor:pointer}
+.cta.secondary{background:var(--chip);color:var(--text);border:1px solid var(--border)}
 .cta:disabled{opacity:.55;cursor:wait}
 .msg{color:var(--muted);font-size:.9rem}
 .consent{display:flex;gap:8px;align-items:flex-start;color:var(--muted);font-size:.82rem;margin-top:12px}
@@ -313,6 +468,7 @@ textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
 .tile .n{font-weight:700;font-size:1.2rem}
 .tile .t{font-size:.75rem;color:var(--muted)}
 .tagline{color:var(--muted);font-size:.85rem;margin:12px 0 0}
+.proof-output{white-space:pre-wrap;overflow:auto;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--muted);padding:12px;margin:16px 0 0;font-size:.78rem;max-height:360px}
 footer{border-top:1px solid var(--border);padding:24px 6vw;color:var(--muted);font-size:.85rem}
 footer p{margin:0}`;
 
@@ -344,6 +500,26 @@ $("analyze").addEventListener("click", async () => {
   $("analyze").disabled = false;
 });
 
+$("proof").addEventListener("click", async () => {
+  const text = $("input").value.trim();
+  const msg = $("msg");
+  const output = $("proof-output");
+  if (!text) { msg.textContent = "Paste or type an observation first."; return; }
+  $("proof").disabled = true; msg.textContent = "Running bounded proof; no external action will execute.";
+  try {
+    const res = await fetch("/api/observatory/proof", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+      source: { name: "Corpora AI dashboard submission", url: window.location.origin, license: "user-provided observation" },
+      entity: { value: "submitted-observation", type: "unknown" }, signal: "analyst-submitted text evidence",
+      observedAt: new Date().toISOString(), details: text, authorizationConfirmed: false, simulationMode: "not-authorized"
+    }) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Proof failed (" + res.status + ")");
+    output.hidden = false; output.textContent = JSON.stringify(data.proof, null, 2);
+    msg.textContent = data.proof.auditId ? "Proof stored encrypted as audit " + data.proof.auditId + "." : "Proof complete; encrypted persistence is not configured in this runtime.";
+  } catch (e) { msg.textContent = e.message; }
+  $("proof").disabled = false;
+});
+
 async function loadSources() {
   try {
     const res = await fetch("/api/corpora/sources");
@@ -368,6 +544,13 @@ function render(d) {
   $("stats").innerHTML = [["words", s.words], ["unique", s.uniqueWords], ["sentences", s.sentences], ["chars", s.characters], ["read min", s.readingTimeMin]]
     .map(([t, n]) => '<div class="tile"><div class="n">' + n + '</div><div class="t">' + t + "</div></div>").join("");
   $("readability").textContent = d.readability !== null ? "Flesch reading ease: " + d.readability : "";
+  if (d.skeptic) {
+    $("skeptic-status").textContent = "Status: " + d.skeptic.status;
+    $("skeptic-hypothesis").textContent = "Hypothesis: " + d.skeptic.hypothesis;
+    $("skeptic-alternative").textContent = "Alternative: " + d.skeptic.alternativeHypothesis;
+    $("skeptic-missing").textContent = "Missing evidence: " + d.skeptic.missingEvidence.join(", ");
+    $("skeptic-next").textContent = "Next question: " + d.skeptic.nextQuestion;
+  }
 }`;
 
 /* ---------- router ---------- */
@@ -379,13 +562,14 @@ export default {
       if (url.pathname === "/" || url.pathname === "/index.html") return asset(PAGE, "text/html; charset=utf-8");
       if (url.pathname === "/style.css") return asset(PAGE_CSS, "text/css; charset=utf-8");
       if (url.pathname === "/app.js") return asset(PAGE_JS, "application/javascript; charset=utf-8");
-      if (url.pathname === "/health") return json({ ok: true, service: "corpora-ai", mode: env.AI ? "ai+algorithmic" : "algorithmic", corporaDb: !!env.DB, aiMemoryDb: !!aiDb(env), model: AI_MODEL });
+      if (url.pathname === "/health") return json({ ok: true, service: "corpora-ai", mode: env.AI ? "ai+algorithmic" : "algorithmic", corporaDb: !!env.DB, aiMemoryDb: !!aiDb(env), encryptedMemory: !!env.AI_MEMORY_ENCRYPTION_KEY, model: AI_MODEL });
     }
     if (request.method === "POST" && url.pathname === "/api/analyze") return handleAnalyze(request, env);
     if (request.method === "POST" && url.pathname === "/api/corpora/ingest") return handleIngest(request, env);
     if (request.method === "GET" && url.pathname === "/api/corpora/search") return handleCorporaSearch(request, env);
     if (request.method === "GET" && url.pathname === "/api/corpora/sources") return handleSourceCatalog(request, env);
     if (request.method === "POST" && url.pathname === "/api/ai/feedback") return handleFeedback(request, env);
+    if (request.method === "POST" && url.pathname === "/api/observatory/proof") return handleObservatoryProof(request, env);
     return new Response("Not found", { status: 404, headers: secHeaders({ "content-type": "text/plain; charset=utf-8" }) });
   },
 };
