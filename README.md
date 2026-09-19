@@ -74,3 +74,5 @@ The adapter serves the same Worker routes on `0.0.0.0` and safely falls back to 
 The repository declares `engines.node` as `>=24.0.0 <25.0.0`, includes `.nvmrc`, and pins Wrangler in `package-lock.json`. There is no Dockerfile in this repository; no Docker runtime change was necessary.
 
 The attached evidence-governance specification is captured in the [AI Threat Observatory reasoning contract](docs/AI-THREAT-OBSERVATORY-REASONING.md) and its [machine-readable v1 policy](contracts/observatory-reasoning.v1.json). This is a defensive policy and provenance boundary; it does not enable live malware execution, external retaliation, or autonomous legal/actor attribution.
+
+See [UPSTREAM-CREDITS.md](UPSTREAM-CREDITS.md) for the professional upstream attribution index, creator links, license-preservation requirements, and the distinction between reference material and incorporated code.

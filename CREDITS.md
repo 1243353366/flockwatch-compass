@@ -60,3 +60,5 @@ The following projects were supplied as architecture references for the agentic-
 | [OpenLLMetry](https://github.com/traceloop/openllmetry) | Traceloop / `@traceloop` | Agent-run and tool-call observability | Catalogue-only; verify upstream license before reuse. |
 
 The reference boundary is deliberate: raw evidence must become normalized observations and retrieved corroboration before the system produces hypotheses or conclusions. No source in this table grants permission to attack real systems, execute arbitrary tools, or bypass authorization.
+
+For the complete professional attribution index, creator links, license-preservation policy, and research-reference boundary, see [UPSTREAM-CREDITS.md](UPSTREAM-CREDITS.md).
