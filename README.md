@@ -123,4 +123,8 @@ See [docs/EVIDENCE-LEGAL-GOVERNANCE.md](docs/EVIDENCE-LEGAL-GOVERNANCE.md), the 
 
 See [docs/CUSTOMER-DATA-PIPELINE.md](docs/CUSTOMER-DATA-PIPELINE.md) for the customer-facing explanation of why data is processed, what is in scope, how encryption works, and the distinction between server-side encryption at rest and true end-to-end encryption.
 
+See [docs/PRIVACY-INTELLIGENCE.md](docs/PRIVACY-INTELLIGENCE.md) for the organization-level data-broker graph, browser-local exposure scan, storage disclosure, opt-out workflow, and reference-only upstream sources.
+
+`GET /api/governance/diagnostics` checks transport, AES-256-GCM configuration, database availability, and collector authentication without returning customer content or secrets. For a local collector, use `http://127.0.0.1:<PORT>/api/edr/ingest`, set `INGEST_TOKEN` in both the adapter and collector environment, and run the collector with a config whose `collector` value matches the launcher (`local-proc` or `osquery`). A failed localhost connection is bounded to four retries and reports `DEGRADED` with a JSONL audit record rather than silently dropping telemetry.
+
 See [docs/INVESTIGATION-WORKSTATION.md](docs/INVESTIGATION-WORKSTATION.md) and the [versioned workstation contract](contracts/investigation-workstation.v1.json) for the human-versus-AI product boundary, evidence-centered reasoning loop, hypothesis fields, controlled experiments, and approval requirements.

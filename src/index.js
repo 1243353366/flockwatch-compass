@@ -435,6 +435,20 @@ async function persistProof(env, proof) {
   } catch { return null; }
 }
 
+async function handleDiagnostics(request, env) {
+  const url = new URL(request.url);
+  const encryptionConfigured = !!(await encryptionKey(env));
+  const databaseConfigured = !!aiDb(env);
+  const checks = {
+    transport: { status: url.protocol === "https:" || url.hostname === "localhost" || url.hostname === "127.0.0.1" ? "OK" : "REVIEW", detail: "HTTPS is required outside localhost." },
+    encryption: { status: encryptionConfigured ? "OK" : "BLOCKED", detail: encryptionConfigured ? "AES-256-GCM persistence is configured." : "Set a valid base64-encoded 32-byte AI_MEMORY_ENCRYPTION_KEY; persistence fails closed until then." },
+    database: { status: databaseConfigured ? "OK" : "DEGRADED", detail: databaseConfigured ? "AI database binding is available." : "Bind AI_DB or DB for persisted audit records; analysis can remain stateless." },
+    collector: { status: env.INGEST_TOKEN ? "CONFIGURED" : "BLOCKED", detail: env.INGEST_TOKEN ? "Ingestion authentication is configured." : "Set INGEST_TOKEN and point the collector to http://127.0.0.1:<PORT>/api/edr/ingest for local testing." },
+  };
+  const fixes = Object.values(checks).filter((check) => check.status === "BLOCKED" || check.status === "DEGRADED" || check.status === "REVIEW").map((check) => check.detail);
+  return json({ ok: fixes.length === 0, checks, dataPath: ["customer input", "AI processing", "redacted operational logs", "error state", "telemetry", "bounded collector audit", "encrypted database persistence", "encrypted audit records", "authorized exports"], fixes: fixes.length ? fixes : ["No configuration repair required."], privacy: "Diagnostics never return customer content, tokens, encryption keys, or raw exception bodies." });
+}
+
 async function handleObservatoryProof(request, env) {
   const ip = request.headers.get("cf-connecting-ip") || "unknown";
   if (rateLimited("proof:" + ip)) return json({ error: "Rate limit: 10 proof runs per minute." }, 429);
@@ -579,6 +593,8 @@ const PAGE = `<!DOCTYPE html>
     <article class="card"><h2>Evidence retrieval</h2><p class="muted">Retrieve content-bearing, provenance-labeled material from the local knowledge index. Results are context, not proof of compromise.</p><div class="row"><input id="retrieve-query" class="text-input" value="incident response" aria-label="Retrieval query"><button id="retrieve" class="cta" type="button">Retrieve content</button></div><pre id="retrieval-output" class="proof-output" hidden></pre></article>
     <article class="card"><h2>Synthetic EDR pipeline</h2><p class="muted">Run one harmless fixture through ingest, normalization, correlation, detection, display, and audit logging. No host agent or real target is contacted.</p><button id="edr-demo" class="cta secondary" type="button">Run synthetic EDR check</button><pre id="edr-output" class="proof-output" hidden></pre></article>
     <article class="card"><h2>EDR health and visibility</h2><p class="muted">Health is based on recent telemetry, not application uptime. Visibility is server-labeled and never upgrades container-local data to host-level EDR.</p><div id="edr-health" class="health-panel">Checking telemetry health&hellip;</div></article>
+    <article class="card"><h2>Customer-data pipeline</h2><p class="muted">Checks transport, encryption, persistence, and local ingestion configuration without exposing secrets or customer content.</p><button id="diagnostics" class="cta secondary" type="button">Check pipeline</button><pre id="diagnostics-output" class="proof-output" hidden></pre></article>
+    <article class="card"><h2>Privacy exposure scan</h2><p class="muted">Browser-local only: paste a public broker result or notice and an identifier you control. The identifier is hashed locally and is not sent to Corpora or broker sites.</p><label class="lbl" for="scan-identifier">Identifier you control</label><input id="scan-identifier" class="text-input" type="text" autocomplete="off" placeholder="Use only your own email, phone, or name"><label class="lbl modal-label" for="scan-material">Pasted public result or privacy notice</label><textarea id="scan-material" rows="4" placeholder="Paste text you already obtained lawfully&hellip;"></textarea><button id="privacy-scan" class="cta secondary" type="button">Scan locally</button><pre id="privacy-output" class="proof-output" hidden></pre><p class="tagline">Storage disclosure: request memory during processing; raw input not stored by default; persisted output requires valid AES-256-GCM configuration; deployment and backup regions are unverified unless the operator documents them.</p></article>
   </section>
   <section id="results" hidden>
     <div class="grid">
@@ -767,6 +783,35 @@ async function loadEdrHealth() {
 loadEdrHealth();
 setInterval(loadEdrHealth, 15000);
 
+$("diagnostics").addEventListener("click", async () => {
+  const output = $("diagnostics-output");
+  $("diagnostics").disabled = true;
+  try {
+    const res = await fetch("/api/governance/diagnostics");
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Diagnostics failed (" + res.status + ")");
+    output.hidden = false;
+    output.textContent = JSON.stringify(data, null, 2);
+  } catch (e) {
+    output.hidden = false;
+    output.textContent = JSON.stringify({ ok: false, fixes: ["Confirm the preview is running on the configured localhost port.", "Check the terminal for a bounded adapter error; customer content is not required for repair."], error: e.message }, null, 2);
+  }
+  $("diagnostics").disabled = false;
+});
+
+$("privacy-scan").addEventListener("click", async () => {
+  const identifier = $("scan-identifier").value.trim();
+  const material = $("scan-material").value;
+  const output = $("privacy-output");
+  if (!identifier || !material.trim()) { output.hidden = false; output.textContent = "Provide your own identifier and paste public material you already obtained lawfully."; return; }
+  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(identifier));
+  const identifierHash = Array.from(new Uint8Array(bytes)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  const needle = identifier.toLowerCase();
+  const matches = material.toLowerCase().split(needle).length - 1;
+  output.hidden = false;
+  output.textContent = JSON.stringify({ mode: "browser-local", identifierHash, rawIdentifierSent: false, matchesInPastedMaterial: matches, storage: { rawInputStored: false, identifierStored: false, hashStored: false }, nextSteps: ["Open the broker's official opt-out or removal page.", "Use only the minimum verification information required.", "Save the confirmation and date in your private records.", "Recheck after the broker's stated processing period.", "If a legal request, identity verification, or dispute is required, consult qualified counsel."], limitation: "This scan does not query broker sites, confirm a match beyond the pasted material, or guarantee removal." }, null, 2);
+});
+
 function render(d) {
   $("results").hidden = false;
   $("summary").textContent = (d.ai && d.ai.summary) || "AI summary unavailable in this mode — see key terms and stats below.";
@@ -800,6 +845,7 @@ export default {
       if (url.pathname === "/style.css") return asset(PAGE_CSS, "text/css; charset=utf-8");
       if (url.pathname === "/app.js") return asset(PAGE_JS, "application/javascript; charset=utf-8");
       if (url.pathname === "/health") return json({ ok: true, service: "corpora-ai", mode: env.AI ? "ai+algorithmic" : "algorithmic", corporaDb: !!env.DB, aiMemoryDb: !!aiDb(env), encryptedMemory: !!(await encryptionKey(env)), model: AI_MODEL });
+      if (url.pathname === "/api/governance/diagnostics") return handleDiagnostics(request, env);
     }
     if (request.method === "POST" && url.pathname === "/api/analyze") return handleAnalyze(request, env);
     if (request.method === "POST" && url.pathname === "/api/corpora/ingest") return handleIngest(request, env);

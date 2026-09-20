@@ -267,3 +267,10 @@ Collector source compilation and safety-gate tests passed. Live endpoint collect
 
 
 A localhost integration test also passed using `collector/local_linux_collector.py`: readable `/proc` process observations were collected from the running application environment, authenticated with the lab token, accepted by `/api/edr/ingest`, normalized, deduplicated, correlated, evaluated, and returned with an audit trail. These events are explicitly labeled `collector=local-proc` and `visibility=container-local`. They are not equivalent to host-level EDR. The osquery path remains the preferred real host source and remains unverified until `osqueryi` is installed on the authorized self-hosted Linux host.
+
+
+## Customer-data flow and localhost recovery validation
+
+The customer-data path was exercised across request processing, redacted operational/error handling, telemetry, collector audit logging, persistence gating, and authorized output boundaries. A deliberately valid-but-misconfigured local-proc collector pointed to `127.0.0.1:19999`; the first run exposed a defect where the local-proc launcher called the shared validator with its default `osquery` collector type. That verified defect was fixed by passing `"local-proc"`. The repaired failure test then produced `DEGRADED`, capped retries at four attempts, and a JSONL audit trail containing retry and failed-ingestion stages without customer content. A recovery test against `127.0.0.1:8787` with a lab token successfully completed authenticated ingestion and returned server-verified `LIVE_LOCAL_OBSERVATION` with `container-local` visibility.
+
+The new `/api/governance/diagnostics` endpoint reports transport, encryption, database, and collector readiness and returns concrete repair instructions. It deliberately omits customer content, tokens, encryption keys, and raw exception bodies. Persisted analysis remains fail-closed without a valid AES-256-GCM key. The browser-local privacy scan hashes a customer-controlled identifier locally and compares it only with customer-pasted public material; it does not query broker sites or transmit identifiers.

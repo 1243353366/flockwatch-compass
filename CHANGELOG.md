@@ -224,3 +224,15 @@ Added versioned evidence-governance and legal-source contracts, plus documentati
 ## [2026-09-19] — Customer data pipeline and encrypted persistence
 
 Added a customer-facing first-run data-use notice covering purpose, scope, and why data is needed. The prompt requires acknowledgment before saving a jurisdiction profile and enables European data-protection mode from customer-declared answers. Persisted analysis output and claims now fail closed unless a valid server-side AES-256-GCM key is configured, matching the existing encrypted observatory-proof boundary. Documentation explicitly distinguishes encrypted storage at rest from true end-to-end encryption because the analysis service must receive plaintext during authorized processing.
+
+
+## [2026-09-19] — Data-flow diagnostics and privacy intelligence
+
+Added `/api/governance/diagnostics` and a dashboard repair panel covering customer input, AI processing, redacted operational logs, error state, telemetry, bounded collector audit, encrypted database persistence, encrypted audit records, and authorized exports. The endpoint reports missing encryption, database, transport, or localhost collector configuration without returning customer content, tokens, keys, or raw exception bodies, and provides concrete repair steps.
+
+Added a browser-local privacy exposure scan and organization-level data-broker intelligence documentation. The scan hashes a customer-controlled identifier locally, compares it only with customer-pasted public material, sends no identifier or pasted material to Corpora or broker sites, discloses storage boundaries, and provides a cautious opt-out workflow. The five supplied upstream sources remain reference-only until independently reviewed; no private-person records or upstream code are incorporated.
+
+
+## [2026-09-19] — Localhost failure recovery
+
+Fixed a verified defect in the local-proc collector launcher: it was invoking the shared configuration validator with the default `osquery` collector type, causing valid local-proc configurations to be rejected. The launcher now passes `local-proc` explicitly. A wrong localhost port was tested end to end: the collector capped retries at four, recorded retry/failure audit stages, and returned `DEGRADED`; after correcting the port and supplying the lab ingestion token, real container-local process telemetry was authenticated, server-labeled, normalized, deduplicated, correlated, audited, and displayed successfully.

@@ -33,6 +33,8 @@ The self-host adapter remains the runtime that exposes the ingestion API. It is 
 | Threat model | `THREAT-MODEL.md` | Security properties, attack surfaces, limitations, and residual uncertainty | Reviewed |
 | Evidence governance | `docs/EVIDENCE-LEGAL-GOVERNANCE.md`, `contracts/evidence-governance.v1.json` | Best-evidence metadata, chain of custody, integrity failures, legal holds, and counsel boundaries | Reviewed, UI profile added |
 | Legal sources | `contracts/legal-sources.v1.json` | Versioned federal, Michigan, and EU reference links with review status | Reference-only |
+| Data-flow diagnostics | `src/index.js` `/api/governance/diagnostics` | Secret-free checks and self-repair guidance for localhost, encryption, database, and collector configuration | Live-smoke-tested |
+| Privacy intelligence | `docs/PRIVACY-INTELLIGENCE.md`, browser-local scan in `src/index.js` | Organization-level broker graph, customer-controlled pasted-material scan, storage disclosure, opt-out guidance | Browser-local; no broker crawling |
 | Host collection | `collector/osquery_collector.py` | Fixed read-only osquery queries; intended for authorized host-level collection | Critical, syntax-tested; live osquery unverified because `osqueryi` is absent |
 | Collector protocol | `collector/ingestion_protocol.py` | One source of truth for auth, 64 KiB batch bound, retry/backoff, failure state, and JSONL audit | Critical, tested |
 | Collector policy | `collector/osquery-lab.json` | Local-only target, endpoint identity, ingestion URL, token environment | Critical, parsed |

@@ -61,7 +61,7 @@ def main():
     parser.add_argument("--config", default=str(Path(__file__).with_name("osquery-lab.json")))
     parser.add_argument("--once", action="store_true")
     args = parser.parse_args()
-    config = load_config(args.config)
+    config = load_config(args.config, "local-proc")
     while True:
         payload = build_payload(config)
         if not payload["events"]:
