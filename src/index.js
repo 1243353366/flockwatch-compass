@@ -748,8 +748,8 @@ async function loadEdrHealth() {
       "Telemetry age: " + (data.freshness && data.freshness.ageSeconds === null ? "UNKNOWN" : (data.freshness && data.freshness.ageSeconds) + "s"),
       "Received / processed / rejected / duplicated: " + [m.received, m.processed, m.rejected, m.duplicated].join(" / "),
       "Auth failures / dropped: " + [m.authenticationFailures, m.dropped].join(" / ")
-    ].join("\n");
-  } catch (e) { $("edr-health").textContent = "State: UNKNOWN\nHealth endpoint unavailable"; }
+    ].join("\\n");
+  } catch (e) { $("edr-health").textContent = "State: UNKNOWN\\nHealth endpoint unavailable"; }
 }
 loadEdrHealth();
 setInterval(loadEdrHealth, 15000);
