@@ -28,7 +28,7 @@ const server = createServer(async (incoming, outgoing) => {
   } catch (error) {
     outgoing.statusCode = 500;
     outgoing.setHeader("content-type", "application/json; charset=utf-8");
-    outgoing.end(JSON.stringify({ error: "self-host adapter failure", detail: String(error.message || error) }));
+    outgoing.end(JSON.stringify({ error: "self-host adapter failure", detail: "The request could not be completed. Check the local service diagnostics; customer content is not included in this response." }));
   }
 });
 

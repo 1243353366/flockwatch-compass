@@ -236,3 +236,8 @@ Added a browser-local privacy exposure scan and organization-level data-broker i
 ## [2026-09-19] — Localhost failure recovery
 
 Fixed a verified defect in the local-proc collector launcher: it was invoking the shared configuration validator with the default `osquery` collector type, causing valid local-proc configurations to be rejected. The launcher now passes `local-proc` explicitly. A wrong localhost port was tested end to end: the collector capped retries at four, recorded retry/failure audit stages, and returned `DEGRADED`; after correcting the port and supplying the lab ingestion token, real container-local process telemetry was authenticated, server-labeled, normalized, deduplicated, correlated, audited, and displayed successfully.
+
+
+## [2026-09-19] — Error-path privacy hardening
+
+Redacted raw exception messages from the self-host adapter’s HTTP error response. Customers now receive a bounded repair message; detailed exception text is not returned through the request path and customer content is not included in the response.
