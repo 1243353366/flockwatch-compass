@@ -41,4 +41,14 @@ These are reference-only sources and must be independently reviewed for current 
 - [clening/databroker-monitor](https://github.com/clening/databroker-monitor)
 - [DrCaiola/optout](https://github.com/DrCaiola/optout)
 
-No upstream code or private-person data is incorporated by this release. The source list is an attribution and research index, not a claim that every source has been ingested or verified current.
+### Verified attribution notes
+
+| Source | Creator or maintainer | License / usage boundary | Safe interpretation |
+|---|---|---|---|
+| OptOutRights/broker-directory | Opt Out Rights Foundation / OptOutRights GitHub organization | CC BY 4.0, per the repository’s own license and README | Organization-level broker directory; its contribution guidance prohibits private-person records. |
+| PersProtect/data-broker-opt-out-list | PersProtect | CC BY 4.0, per the repository README and license | Organization and people-search-site metadata with opt-out references; links require current verification. |
+| Privacy Guides data-broker removals | Privacy Guides volunteer collective | Documentation is CC BY-SA 4.0; repository code is separately MIT | Human-facing removal guidance, not a private-person dataset; adaptations must preserve attribution/share-alike requirements. |
+| clening/databroker-monitor | Carey Lening | MIT | Reference for local-only opt-out tracking; do not import identity files, execute searches, or automate submissions. |
+| DrCaiola/optout | DrCaiola repository owner/maintainer attribution | CC BY-NC-SA 4.0; adapted broker list has the same stated boundary | Noncommercial reference only unless permission is obtained; do not copy code/data into a commercial deployment without review. |
+
+No upstream code or private-person data is incorporated by this release. The source list is an attribution and research index, not a claim that every source has been ingested or verified current. URLs, broker procedures, license statements, and legal requirements must be rechecked before use.
