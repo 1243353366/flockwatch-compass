@@ -42,6 +42,11 @@ transform retrieved material into instructions for attacking real systems.
 - `POST /api/login/key/verify` - exchange the one-time key for a temporary in-memory session
 - `POST /api/login/provider` - report provider connector status without requesting credentials in the Worker
 - `POST /api/ads/observe` - analyze a user-permitted ad observation with session-only retention
+- `GET /api/search?q=` - search the privacy, device-defense, cybersecurity-research, tool, and provenance index only
+- `POST /api/reasoning/run` - run the explicit hypothesis → evidence → contradiction → conclusion state loop
+- `GET /api/synthetic/threatintel` - return the synthetic threat-intel dataset and attack/propagation graph
+- `POST /api/synthetic/botnet-emulator` - run the defensive-only synthetic relay/fan-out emulator
+- `POST /api/integrations/aadi/reasoning` - authorized bridge to Aadi's Digital Lab evidence-grounded reasoning Worker
 
 ## Deploy
 
@@ -71,6 +76,18 @@ The dashboard exposes all 100 requested tools across the cybersecurity/research 
 The dashboard includes a login portal offering iCloud, GitHub, Gmail, work email, YouTube, and a generated one-time API key. Provider buttons currently report that separately registered OAuth connectors are required; the Worker does not collect provider passwords or silently request mailbox, message, contact, or account-history access. The one-time API-key path returns a key once, stores only its hash in the Worker isolate for ten minutes, and exchanges it for a temporary session.
 
 After login, ad analysis requires separate consent, a declared source, the restricted scope `ad-observations-only`, and `session-only` retention. The current safe implementation analyzes an ad label or description supplied by the user and returns likely targeting categories, possible signals, advertiser information if visibly supplied, unknowns, and next steps. It does not claim to inspect a user's private account feed automatically, and it does not store a personal advertising profile. Production provider connections should use narrowly scoped OAuth grants and platform-approved ad-transparency or preference APIs.
+
+The dashboard's scoped search bar searches only those privacy and defensive-research indexes, including the 100-tool registry and provenance sources. It does not search arbitrary people, private accounts, credentials, or unrestricted web content. A specific public URL must be submitted separately through the authorized research-browser workflow.
+
+## Aadi's Digital Lab integration
+
+Corpora integrates the upstream [Aadi's Digital Lab repository](https://github.com/1243353366/aadi-digital-lab) through a bounded reasoning bridge to its public `/api/reasoning/ask` contract. The integration records the repository, pinned inspected commit, and **MIT license** in the response provenance. Questions require explicit user authorization, are size-limited, and receive an upstream timeout. Upstream responses are treated as untrusted research results and require human review; the Aadi Worker does not gain Corpora's tools, credentials, customer data, or authority. If the upstream Worker is unavailable, Corpora returns a local synthetic reasoning fallback rather than silently claiming an upstream result.
+
+## Explicit reasoning and synthetic botnet emulator
+
+The reasoning lab exposes a state machine with **hypothesis generation → evidence gathering → contradiction checking → conclusion**. Each run includes chained tool IDs from the registry, confidence with a defined interpretation, alternative explanations, conflicting evidence, missing evidence, stopping states such as `NEEDS_EVIDENCE`, and a complete audit trail. The system is designed to stop rather than manufacture certainty.
+
+The botnet teaching view is deliberately an emulator, not a botnet. Its threat-intel records, relay/fan-out graph, scenario generator, telemetry, defensive controls, and recovery sequence are synthetic fixtures. The fail-closed preflight requires an authorized isolated synthetic target, safe simulation mode, no network, and no propagation. No sockets, commands, malware, persistence, credential theft, lateral movement, external C2, scanning, or real-target interaction are implemented.
 
 `GET /api/edr/health` reports server-derived `telemetryTrust` (`VERIFIED`, `DEGRADED`, or `UNVERIFIED`) alongside freshness, heartbeat, duplicate, rejection, authentication-failure, and timestamp-quality metrics. `visibility` remains explicit: `container-local`, `host-level`, `synthetic`, or `unknown`.
 

@@ -554,6 +554,10 @@ const PAGE = `<!DOCTYPE html>
   <a class="brand" href="/">Corpora <span>AI</span></a>
   <button id="theme-toggle" class="icon-btn" type="button" aria-label="Toggle theme"></button>
 </header>
+<section class="search-strip" aria-label="Scoped Corpora search">
+  <div class="search-inner"><div><div class="lbl">Scoped search</div><p class="search-note">Search privacy, device defense, cybersecurity research, tools, and provenance sources only.</p></div><div class="search-row"><input id="scoped-search" class="text-input" type="search" placeholder="Try: data broker, MFA, ATT&CK, chain of custody" autocomplete="off"><button id="scoped-search-button" class="cta" type="button">Search</button></div></div>
+  <div id="scoped-search-results" class="search-results" hidden></div>
+</section>
 <section id="jurisdiction-prompt" class="modal" hidden aria-labelledby="jurisdiction-title" role="dialog" aria-modal="true">
   <div class="modal-card">
     <h2 id="jurisdiction-title">Configure data-protection profile</h2>
@@ -623,6 +627,8 @@ const PAGE = `<!DOCTYPE html>
     <pre id="research-output" class="proof-output" hidden></pre>
   </section>
   <section class="input-card catalog-card" id="tool-catalog"><div class="lbl">100 bounded agent tools</div><p class="muted">Every tool is a policy object, not an unrestricted command. The catalog is transparent; authorization does not execute a tool.</p><div class="row"><input id="tool-filter" class="text-input" placeholder="Filter tools by name or category" aria-label="Filter tools"><span id="tool-count" class="msg"></span></div><div id="tool-list" class="tool-list">Loading tool policy catalog&hellip;</div></section>
+  <section class="input-card" id="reasoning-lab"><div class="lbl">Explicit reasoning and synthetic botnet emulator</div><p class="muted">Watch hypothesis generation → evidence gathering → contradiction checking → conclusion. The emulator visualizes a synthetic relay/fan-out pattern only; it does not create sockets, commands, malware, persistence, propagation, or real targets.</p><textarea id="reasoning-observation" rows="3" placeholder="Describe a synthetic observation to investigate"></textarea><label class="consent"><input id="reasoning-authorize" type="checkbox"> I authorize this isolated synthetic exercise.</label><div class="row"><button id="run-reasoning" class="cta" type="button">Run reasoning loop</button><button id="run-botnet-emulator" class="cta secondary" type="button">Run defensive emulator</button></div><pre id="reasoning-output" class="proof-output" hidden></pre></section>
+  <section class="input-card" id="aadi-bridge"><div class="lbl">Aadi&rsquo;s Digital Lab &middot; reasoning bridge</div><p class="muted">Use the MIT-licensed upstream reasoning layer as a bounded evidence source. The response is marked untrusted, provenance-linked, and human-review required; it does not gain Corpora permissions.</p><textarea id="aadi-question" rows="3" placeholder="Ask an evidence-grounded research question"></textarea><label class="consent"><input id="aadi-authorize" type="checkbox"> I authorize this question to be sent to the connected Aadi reasoning Worker.</label><button id="aadi-ask" class="cta" type="button">Ask Aadi&rsquo;s reasoning layer</button><pre id="aadi-output" class="proof-output" hidden></pre></section>
   <section class="input-card catalog-card"><div class="lbl">Agent architecture catalog</div><p class="muted">Reference-only sources shaping retrieval, structured claims, evaluation, and observability. No upstream code is executed here.</p><div id="source-catalog" class="catalog">Loading source catalog&hellip;</div></section>
   <section class="grid">
     <article class="card"><h2>Customer privacy controls</h2><p class="muted">Use the run ID and private access token returned when you opted into persistence. Export returns encrypted output; deletion removes the run, claims, feedback, and access credential.</p><label class="lbl" for="privacy-run-id">Run ID</label><input id="privacy-run-id" class="text-input" inputmode="numeric" autocomplete="off" placeholder="e.g. 12"><label class="lbl modal-label" for="privacy-token">Access token</label><input id="privacy-token" class="text-input" type="password" autocomplete="off" placeholder="Paste the private token"><div class="row"><button id="privacy-export" class="cta secondary" type="button">Export encrypted run</button><button id="privacy-delete" class="cta secondary" type="button">Delete run</button></div><pre id="privacy-run-output" class="proof-output" hidden></pre></article>
@@ -650,6 +656,7 @@ const PAGE_CSS = `:root{--bg:#0b0e14;--card:#12161f;--border:#232a37;--text:#e6e
 [data-theme=light]{--bg:#f7f8fa;--card:#ffffff;--border:#e3e6ec;--text:#1a1d24;--muted:#5b6472;--accent:#6d4de0;--accent-ink:#f4f0ff;--chip:#eef0f5}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
 .nav{display:flex;justify-content:space-between;align-items:center;padding:18px 6vw;border-bottom:1px solid var(--border)}
+.search-strip{border-bottom:1px solid var(--border);background:var(--card);padding:16px 6vw}.search-inner{max-width:900px;margin:0 auto;display:flex;align-items:end;justify-content:space-between;gap:18px;flex-wrap:wrap}.search-note{color:var(--muted);font-size:.8rem;margin:0}.search-row{display:flex;gap:8px;flex:1;min-width:min(100%,420px)}.search-results{max-width:900px;margin:12px auto 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:8px}.search-result{background:var(--chip);border:1px solid var(--border);border-radius:10px;padding:10px}.search-result b{display:block}.search-result small{display:block;color:var(--muted);margin-top:4px}.search-result a{color:var(--accent)}
 .modal{position:fixed;inset:0;z-index:10;display:grid;place-items:center;padding:20px;background:rgba(0,0,0,.72)}.modal[hidden]{display:none}.modal-card{width:min(560px,100%);background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.35)}.modal-card h2{margin-top:0}.modal-label{margin-top:16px}.data-notice{background:var(--chip);border:1px solid var(--border);border-radius:8px;padding:10px;margin:10px 0;color:var(--muted);font-size:.82rem}.data-notice strong{color:var(--text)}.legal-note{color:var(--muted);font-size:.78rem;border-left:3px solid var(--accent);padding-left:10px;margin:16px 0}
 .brand{color:var(--text);text-decoration:none;font-weight:700;font-size:1.15rem;letter-spacing:.02em}
 .brand span{color:var(--accent)}
@@ -707,6 +714,21 @@ btn.addEventListener("click", () => {
   const t = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
   localStorage.setItem("corpora-theme", t); setTheme(t);
 });
+
+async function runScopedSearch() {
+  const query = $("scoped-search").value.trim();
+  const output = $("scoped-search-results");
+  if (!query) { output.hidden = true; return; }
+  output.hidden = false; output.textContent = "Searching the scoped privacy and defensive-research index…";
+  try {
+    const res = await fetch("/api/search?q=" + encodeURIComponent(query));
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Search failed");
+    output.innerHTML = (data.results || []).map((item) => '<article class="search-result"><b>' + esc(item.title) + '</b><small>' + esc(item.scope) + " · " + esc(item.type) + '</small><small>' + esc(item.description) + '</small>' + (item.url ? '<small><a href="' + esc(item.url) + '" target="_blank" rel="noreferrer">Open provenance source</a></small>' : "") + '</article>').join("") || '<div class="search-result">No results in the privacy and defensive-research scope.</div>';
+  } catch (e) { output.textContent = e.message; }
+}
+$("scoped-search-button").addEventListener("click", runScopedSearch);
+$("scoped-search").addEventListener("keydown", (event) => { if (event.key === "Enter") runScopedSearch(); });
 
 /* Jurisdiction is customer-provided configuration; never infer it from IP geolocation. */
 const jurisdictionPrompt = $("jurisdiction-prompt");
@@ -802,6 +824,24 @@ const renderTools = () => {
 };
 $("tool-filter").addEventListener("input", renderTools);
 fetch("/api/tools/catalog").then((res) => res.json()).then((data) => { toolCatalog = data.tools || []; renderTools(); }).catch(() => { $("tool-list").textContent = "Tool policy catalog unavailable."; });
+
+async function runSyntheticReasoning(path) {
+  const output = $("reasoning-output");
+  if (!$("reasoning-authorize").checked) { output.hidden = false; output.textContent = "Explicit isolated synthetic authorization is required."; return; }
+  const body = path.includes("botnet") ? { synthetic: true, authorized: true, isolated: true, noNetwork: true, noPropagation: true, safeSimulationMode: true, scenarioSeed: "dashboard", observation: $("reasoning-observation").value } : { synthetic: true, authorized: true, isolated: true, scenarioSeed: "dashboard", observation: $("reasoning-observation").value };
+  const res = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const data = await res.json(); output.hidden = false; output.textContent = JSON.stringify(data, null, 2);
+}
+$("run-reasoning").addEventListener("click", () => runSyntheticReasoning("/api/reasoning/run"));
+$("run-botnet-emulator").addEventListener("click", () => runSyntheticReasoning("/api/synthetic/botnet-emulator"));
+$("aadi-ask").addEventListener("click", async () => {
+  const output = $("aadi-output");
+  if (!$('aadi-authorize').checked) { output.hidden = false; output.textContent = "Explicit authorization is required before using the Aadi reasoning bridge."; return; }
+  const question = $("aadi-question").value.trim();
+  if (question.length < 3) { output.hidden = false; output.textContent = "Enter a research question of at least 3 characters."; return; }
+  const res = await fetch("/api/integrations/aadi/reasoning", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ authorized: true, question }) });
+  const data = await res.json(); output.hidden = false; output.textContent = JSON.stringify(data, null, 2);
+});
 
 let adSessionToken = "";
 const loginStatus = $("login-status");
@@ -984,6 +1024,11 @@ export default {
     if (request.method === "POST" && url.pathname === "/api/login/key/verify") return handleKeyVerify(request, env);
     if (request.method === "POST" && url.pathname === "/api/login/provider") return handleProviderLogin(request, env);
     if (request.method === "POST" && url.pathname === "/api/ads/observe") return handleAdObservation(request, env);
+    if (request.method === "GET" && url.pathname === "/api/search") return handleScopedSearch(url, env);
+    if (request.method === "POST" && url.pathname === "/api/reasoning/run") return handleReasoningRun(request, env);
+    if (request.method === "GET" && url.pathname === "/api/synthetic/threatintel") return handleSyntheticThreatIntel();
+    if (request.method === "POST" && url.pathname === "/api/synthetic/botnet-emulator") return handleSyntheticBotnet(request, env);
+    if (request.method === "POST" && url.pathname === "/api/integrations/aadi/reasoning") return handleAadiReasoningBridge(request, env);
     if (request.method === "POST" && url.pathname === "/api/corpora/ingest") return handleIngest(request, env);
     if (request.method === "GET" && url.pathname === "/api/corpora/search") return handleCorporaSearch(request, env);
     if (request.method === "GET" && url.pathname === "/api/corpora/sources") return handleSourceCatalog(request, env);
@@ -1377,4 +1422,147 @@ async function handleAdObservation(request) {
   if (!adText) return json({ error: "Supply an observed ad label or description; private account content is not accepted." }, 400);
   const result = classifyAdObservation({ ...body, adText });
   return json({ ok: true, workflow: ["LOGIN", "EXPLICIT CONSENT", "CONNECT AVAILABLE DATA SOURCE", "COLLECT PERMITTED AD OBSERVATION", "EXPLAIN WHY IT MAY HAVE APPEARED", "SHOW COMPANIES AND DATA CATEGORIES", "REPORT"], source: body.source, analyzedAt: new Date().toISOString(), retention: "session-only", result, privacyBoundary: "No mailbox, message body, contacts, password, private account history, precise location, Wi-Fi, cellular, or device fingerprint was requested or stored." });
+}
+
+
+/* ---------- scoped privacy and defensive-research search ---------- */
+
+const SCOPED_SEARCH_ENTRIES = [
+  { type: "topic", title: "Privacy exposure and data-broker research", scope: "data privacy", description: "Find broker relationships, exposure-scanning guidance, opt-out mechanisms, storage disclosures, and privacy-risk workflows." },
+  { type: "topic", title: "Consent and customer-data lifecycle", scope: "data privacy", description: "Review collection, processing, retention, export, deletion, provenance, jurisdiction, and purpose-limitation controls." },
+  { type: "topic", title: "Device and account defense", scope: "data privacy", description: "Review authorized device permissions, browser extensions, network connections, MFA, sessions, updates, and telemetry health." },
+  { type: "topic", title: "Public-web research browser", scope: "cybersecurity research", description: "Retrieve public HTTPS evidence with robots checks, provenance, redirect limits, and webpage prompt-injection warnings." },
+  { type: "topic", title: "Evidence and chain of custody", scope: "cybersecurity research", description: "Preserve hashes, timestamps, source provenance, verification labels, contradictions, and human-review gates." },
+  { type: "topic", title: "Safe cyber-range simulation", scope: "cybersecurity research", description: "Use only predefined synthetic targets and defensive regression cases; no arbitrary commands or real-world attack execution." },
+  { type: "source", title: "MITRE ATT&CK", scope: "cybersecurity research", description: "Behavior vocabulary for evidence-supported technique mapping.", url: "https://attack.mitre.org/" },
+  { type: "source", title: "NIST incident response guidance", scope: "cybersecurity research", description: "Incident-response lifecycle and evidence-preservation reference.", url: "https://csrc.nist.gov/pubs/sp/800/61/r2/final" },
+  { type: "source", title: "CISA Known Exploited Vulnerabilities", scope: "cybersecurity research", description: "Public vulnerability-prioritization reference; catalog membership is not proof of local compromise.", url: "https://www.cisa.gov/known-exploited-vulnerabilities-catalog" },
+  { type: "source", title: "Data broker opt-out references", scope: "data privacy", description: "Reference-only sources for organization-level broker research and user-directed opt-out workflows.", url: "https://github.com/OptOutRights/broker-directory" },
+  { type: "source", title: "Aadi's Digital Lab", scope: "cybersecurity research", description: "MIT-licensed upstream evidence-grounded reasoning Worker and D1 evaluation layer, integrated through a bounded bridge.", url: "https://github.com/1243353366/aadi-digital-lab" },
+];
+
+async function handleScopedSearch(url, env) {
+  const query = (url.searchParams.get("q") || "").trim().slice(0, 120);
+  if (!query) return json({ ok: true, scope: ["data privacy", "cybersecurity research"], results: [], message: "Search privacy, defensive research, tools, sources, or evidence workflows." });
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const entries = [...SCOPED_SEARCH_ENTRIES, ...TOOL_CATALOG.map((tool) => ({ type: "tool", title: tool.name, scope: tool.category === "privacy-device-defense" ? "data privacy" : "cybersecurity research", description: tool.purpose, toolId: tool.id }))];
+  const results = entries.map((entry) => ({ entry, score: terms.reduce((score, term) => score + (Object.values(entry).join(" ").toLowerCase().includes(term) ? 1 : 0), 0) })).filter((item) => item.score > 0).sort((a, b) => b.score - a.score || a.entry.title.localeCompare(b.entry.title)).slice(0, 30).map((item) => item.entry);
+  return json({ ok: true, query, scope: ["data privacy", "cybersecurity research"], results, boundary: "This search does not search arbitrary people, private accounts, credentials, or unrestricted web content. Use the separately authorized public research browser for a specific public URL." });
+}
+
+
+/* ---------- explicit reasoning loop and synthetic botnet emulator ---------- */
+
+const SYNTHETIC_THREAT_INTEL = Object.freeze([
+  { id: "intel-001", type: "domain", value: "relay-sim.example", source: "SYNTHETIC_FIXTURE", observedAt: "2026-01-10T10:00:00Z", confidence: 0.72, note: "Synthetic relay label; not a resolvable or actionable domain." },
+  { id: "intel-002", type: "ip", value: "198.51.100.24", source: "SYNTHETIC_FIXTURE", observedAt: "2026-01-10T10:01:00Z", confidence: 0.68, note: "TEST-NET address reserved for documentation and simulation." },
+  { id: "intel-003", type: "process", value: "simulated-agent", source: "SYNTHETIC_TELEMETRY", observedAt: "2026-01-10T10:02:00Z", confidence: 0.81, note: "Synthetic process label; no process was created." },
+  { id: "intel-004", type: "behavior", value: "periodic-beacon-pattern", source: "SYNTHETIC_TELEMETRY", observedAt: "2026-01-10T10:03:00Z", confidence: 0.64, note: "Synthetic timing sequence used to teach detection and uncertainty." },
+  { id: "intel-005", type: "behavior", value: "fan-out-propagation-pattern", source: "SYNTHETIC_GRAPH", observedAt: "2026-01-10T10:04:00Z", confidence: 0.51, note: "Graph relationship only; no network propagation occurred." },
+]);
+
+const SYNTHETIC_ATTACK_GRAPH = Object.freeze({
+  nodes: [
+    { id: "n1", label: "Synthetic entry observation", kind: "observation", verification: "fixture" },
+    { id: "n2", label: "Simulated agent A", kind: "endpoint", verification: "fixture" },
+    { id: "n3", label: "Simulated relay", kind: "infrastructure", verification: "fixture" },
+    { id: "n4", label: "Simulated agent B", kind: "endpoint", verification: "fixture" },
+    { id: "n5", label: "Synthetic fan-out", kind: "behavior", verification: "hypothesis" },
+    { id: "n6", label: "Defensive control point", kind: "mitigation", verification: "planned" },
+  ],
+  edges: [
+    { from: "n1", to: "n2", label: "observed-at", evidence: "intel-003" },
+    { from: "n2", to: "n3", label: "simulated-beacon-to", evidence: "intel-004" },
+    { from: "n3", to: "n4", label: "synthetic-fan-out-to", evidence: "intel-005" },
+    { from: "n4", to: "n5", label: "supports-hypothesis", evidence: "intel-005" },
+    { from: "n3", to: "n6", label: "defensive-control", evidence: "planned" },
+  ],
+});
+
+function syntheticScenario(seed = "default") {
+  const normalized = String(seed).slice(0, 80) || "default";
+  return {
+    scenarioId: "synthetic-botnet-" + normalized.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 30),
+    title: "Contained synthetic relay-and-fan-out exercise",
+    objective: "Determine whether periodic synthetic telemetry supports a coordinated relay hypothesis without treating the graph as proof of a real botnet.",
+    stages: ["initial-observation", "synthetic-control-channel", "fan-out-pattern", "defensive-detection", "recovery"],
+    safety: { synthetic: true, isolated: true, noNetwork: true, noSockets: true, noCommands: true, noPropagation: true, noMalware: true, noPersistence: true, noExternalTargets: true },
+    generatedFrom: normalized,
+  };
+}
+
+function chainTool(name, input, output, status = "complete") {
+  const tool = TOOL_CATALOG.find((item) => item.name === name);
+  return { toolId: tool && tool.id, tool: name, input, output, status, policy: tool ? { readOnly: tool.readOnly, authorizationRequired: tool.requiresUserAuthorization, provenanceRequired: tool.provenanceRequired, simulationOnly: tool.simulationOnly } : null };
+}
+
+function buildReasoningRun(observation, scenario) {
+  const evidence = SYNTHETIC_THREAT_INTEL.map((item) => ({ ...item, relevance: item.type === "behavior" ? "direct" : "contextual" }));
+  const contradiction = { status: "conflicting_evidence_present", conflicts: [{ claim: "fan-out implies coordination", counterEvidence: "the same timing pattern can arise from benign scheduled jobs or shared infrastructure", resolution: "do not attribute; gather independent endpoint telemetry" }], missingEvidence: ["independent host telemetry", "validated timestamps from separate collectors", "operator authorization record"] };
+  const hypothesis = { statement: "A coordinated synthetic relay pattern may explain the observed periodic and fan-out relationships.", confidence: 0.58, classification: "CANDIDATE_HYPOTHESIS", alternatives: ["benign scheduled activity", "shared service behavior", "incomplete or delayed telemetry"], notEstablished: ["real botnet", "malware", "attribution", "compromise"] };
+  const conclusion = contradiction.status === "conflicting_evidence_present" ? { status: "NEEDS_EVIDENCE", statement: "The synthetic observations demonstrate how a relay-and-fan-out pattern could appear, but conflicting explanations remain. No real-world conclusion is warranted.", confidence: 0.41 } : { status: "COMPLETE", statement: "Evidence supports the bounded synthetic exercise only.", confidence: 0.8 };
+  return {
+    runId: "reasoning-" + crypto.randomUUID(),
+    observation: { text: String(observation || "synthetic botnet training observation").slice(0, 1000), provenance: "USER_DECLARED_SYNTHETIC_EXERCISE" },
+    state: "CONCLUSION",
+    stoppingState: conclusion.status,
+    loop: [
+      { state: "HYPOTHESIS_GENERATION", status: "complete", output: hypothesis },
+      { state: "EVIDENCE_GATHERING", status: "complete", output: evidence, toolChain: [chainTool("IOC Extractor", "synthetic fixture", "5 bounded indicators"), chainTool("Threat-Intel Correlator", "synthetic indicators", "fixture relationships"), chainTool("Telemetry-Health Analyzer", "synthetic telemetry", "coverage remains synthetic")] },
+      { state: "CONTRADICTION_CHECKING", status: "complete", output: contradiction, toolChain: [chainTool("Contradiction Detector", "candidate hypothesis and evidence", "alternative explanations"), chainTool("Hypothesis Challenger", "candidate hypothesis", "non-attribution challenge")] },
+      { state: "CONCLUSION", status: "complete", output: conclusion, requiresHumanReview: true },
+    ],
+    uncertainty: { confidence: conclusion.confidence, scale: "0..1", meaning: "confidence in this bounded interpretation, not probability of compromise", calibration: "synthetic fixture; not validated against a real incident" },
+    auditTrail: [
+      { sequence: 1, stage: "authorize", status: "synthetic-scope-confirmed", evidence: "user-declared exercise" },
+      { sequence: 2, stage: "generate-hypothesis", status: "complete", evidence: "hypothesis object" },
+      { sequence: 3, stage: "gather-evidence", status: "complete", evidence: "SYNTHETIC_THREAT_INTEL" },
+      { sequence: 4, stage: "check-contradictions", status: "complete", evidence: "alternative explanations retained" },
+      { sequence: 5, stage: "stop", status: conclusion.status, evidence: "stopping state prevents unsupported escalation" },
+    ],
+    safety: scenario.safety,
+  };
+}
+
+async function handleSyntheticThreatIntel() {
+  return json({ ok: true, dataset: "SYNTHETIC_THREAT_INTEL", records: SYNTHETIC_THREAT_INTEL, graph: SYNTHETIC_ATTACK_GRAPH, disclaimer: "All indicators and relationships are fixtures. No DNS lookup, socket, propagation, malware, or external target action occurs." });
+}
+
+async function handleReasoningRun(request) {
+  const body = await readJson(request);
+  if (!body || body.synthetic !== true || body.authorized !== true || body.isolated !== true) return json({ error: "Reasoning run requires synthetic=true, authorized=true, and isolated=true." }, 403);
+  return json({ ok: true, reasoning: buildReasoningRun(body.observation, syntheticScenario(body.scenarioSeed)) });
+}
+
+async function handleSyntheticBotnet(request) {
+  const body = await readJson(request);
+  const required = ["synthetic", "authorized", "isolated", "noNetwork", "noPropagation", "safeSimulationMode"];
+  const failed = required.find((key) => body && body[key] !== true);
+  if (failed) return json({ error: `Synthetic emulator blocked: ${failed} must be true.`, state: "BLOCKED" }, 403);
+  const scenario = syntheticScenario(body.scenarioSeed);
+  const reasoning = buildReasoningRun(body.observation, scenario);
+  return json({ ok: true, emulator: { scenario, graph: SYNTHETIC_ATTACK_GRAPH, telemetry: SYNTHETIC_THREAT_INTEL, simulatedSteps: ["fixture-observation", "fixture-beacon-correlation", "fixture-fan-out-visualization", "defensive-control-evaluation", "recovery-confirmation"], executed: false, networkActivity: "none", propagation: "none", commands: "none", malware: "none" }, reasoning, defensiveSimulation: { detection: "synthetic periodic and fan-out pattern flagged for review", mitigation: ["validate telemetry continuity", "segment or constrain authorized lab fixtures", "add reversible detection rules", "preserve evidence and require human review"], counterAction: "not implemented; no retaliation or real-target action", recovery: "synthetic fixture reset" } });
+}
+
+
+/* ---------- Aadi's Digital Lab integration bridge ---------- */
+
+const AADI_REASONING_ORIGIN = "https://aadi-digital-lab-fullstack.aadishankar1999.workers.dev";
+const AADI_REPO = "https://github.com/1243353366/aadi-digital-lab";
+const AADI_INTEGRATION_COMMIT = "78c865d71dc56980da6c8e460f6647f76ae8b6c1";
+
+async function handleAadiReasoningBridge(request) {
+  const body = await readJson(request);
+  if (!body || body.authorized !== true) return json({ error: "Explicit authorization is required before using the Aadi reasoning bridge." }, 403);
+  const question = typeof body.question === "string" ? body.question.trim().slice(0, 300) : "";
+  if (question.length < 3) return json({ error: "Question must be at least 3 characters and must not include private credentials or unrestricted personal data." }, 400);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const upstream = await fetch(AADI_REASONING_ORIGIN + "/api/reasoning/ask", { method: "POST", headers: { "content-type": "application/json", accept: "application/json" }, body: JSON.stringify({ question }), signal: controller.signal });
+    const data = await upstream.json().catch(() => ({}));
+    if (!upstream.ok) return json({ ok: false, state: "UPSTREAM_UNAVAILABLE", upstreamStatus: upstream.status, upstream: data, provenance: { repository: AADI_REPO, commit: AADI_INTEGRATION_COMMIT, license: "MIT", contentTrust: "untrusted-upstream-analysis" } }, 502);
+    return json({ ok: true, state: "UPSTREAM_RESULT_RECEIVED", upstream: data, provenance: { repository: AADI_REPO, commit: AADI_INTEGRATION_COMMIT, license: "MIT", contentTrust: "untrusted-upstream-analysis", humanReviewRequired: true }, boundary: "Aadi's response is an evidence-grounded research result, not authority. Corpora does not grant it new tools, permissions, or data access." });
+  } catch { return json({ ok: false, state: "UPSTREAM_TIMEOUT", fallback: buildReasoningRun(question, syntheticScenario("aadi-bridge-fallback")), provenance: { repository: AADI_REPO, commit: AADI_INTEGRATION_COMMIT, license: "MIT", contentTrust: "local-fallback" } }, 504); }
+  finally { clearTimeout(timeout); }
 }
