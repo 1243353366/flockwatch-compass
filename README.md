@@ -118,3 +118,5 @@ See [UPSTREAM-CREDITS.md](UPSTREAM-CREDITS.md) for the professional upstream att
 See [AUDIT-REPORT.md](AUDIT-REPORT.md) for the adversarial syntax, runtime, deployment, EDR, evidence, encryption, failure-mode, and security-boundary assessment. The report deliberately distinguishes demonstrated capabilities from partial and untested components.
 
 See [THREAT-MODEL.md](THREAT-MODEL.md) for the security-platform threat model covering telemetry poisoning, untrusted evidence and prompt injection, collector compromise, range escape, resource exhaustion, audit evasion, and recovery trust.
+
+See [docs/INVESTIGATION-WORKSTATION.md](docs/INVESTIGATION-WORKSTATION.md) and the [versioned workstation contract](contracts/investigation-workstation.v1.json) for the human-versus-AI product boundary, evidence-centered reasoning loop, hypothesis fields, controlled experiments, and approval requirements.

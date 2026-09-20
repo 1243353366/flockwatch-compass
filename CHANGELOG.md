@@ -209,3 +209,8 @@ Python syntax, JSON configuration, Worker syntax, forbidden-primitive scanning, 
 - Synthetic containment isolated only synthetic agent IDs and reported no external effect.
 - Invalid range, authorization, target, isolation, or safe-mode preflight was rejected with HTTP 403.
 - No arbitrary commands, shell execution, external-agent enrollment, scanning, persistence, privilege escalation, lateral movement, tunneling, file transfer, malware deployment, or Internet-facing C2 listener was added.
+
+
+## [2026-09-19] — Investigation workstation contract
+
+Added `docs/INVESTIGATION-WORKSTATION.md` and `contracts/investigation-workstation.v1.json`. The contract separates human responsibilities from AI reasoning, defines the retrieve/verify/correlate/challenge/hypothesize/test/explain/recommend/preserve-provenance loop, requires observed-versus-inferred claim levels and competing hypotheses, treats telemetry gaps as uncertainty rather than absence of threats, and requires human authorization for high-impact defensive actions. It also formalizes the controlled experiment and simulation-learning loop without granting the AI operational authority.
