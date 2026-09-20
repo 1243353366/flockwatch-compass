@@ -20,6 +20,26 @@ Use these links to bypass the in-app setup flow:
 
 Codespaces uses the checked-in `.devcontainer/devcontainer.json`: Node.js 24 is provisioned, dependencies are installed, the self-host adapter starts on port `8787`, and GitHub forwards that port to a browser tab. The first launch may require GitHub authentication and Codespaces availability. For a local download, run `npm ci && npm start`, then open `http://localhost:8787`.
 
+### Friend-ready GitHub setup
+
+1. Open [Launch Corpora AI in Codespaces](https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=1243353366%2Fcorpora-ai).
+2. Sign in to GitHub and create the Codespace from the `main` branch.
+3. Wait for the automatic setup to finish. It installs Node.js 24 and dependencies, starts the self-host adapter, and opens forwarded port `8787`.
+4. Use the scoped search bar for privacy, device-defense, and cybersecurity research topics.
+5. Use the 100-tool catalog to inspect each tool's authorization and data-scope policy.
+6. Use the Aadi reasoning bridge only after checking explicit authorization; upstream results are untrusted and require human review.
+7. Use the synthetic botnet emulator only with the displayed isolated-simulation consent. It performs no network activity, propagation, malware execution, or real-target interaction.
+
+### Third-party browser setup
+
+Use [Replit Import](https://replit.com/import), choose **GitHub**, and enter `https://github.com/1243353366/corpora-ai`. Replit can provide a browser-based development environment and preview, subject to its account, runtime, and hosting policies. Do not add API keys, Cloudflare tokens, database credentials, or customer data to a public Replit project. The repository's own self-host adapter is the intended no-database preview path.
+
+### Shareable links
+
+- [Codespaces browser launch](https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=1243353366%2Fcorpora-ai)
+- [Replit Import](https://replit.com/import)
+- [Direct ZIP download](https://github.com/1243353366/corpora-ai/archive/refs/heads/main.zip)
+
 ## Research-Use Policy
 
 Corpora AI analyzes offensive cyber material strictly as research data.
