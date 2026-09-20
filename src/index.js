@@ -152,15 +152,20 @@ function aiDb(env) { return env.AI_DB || env.DB; }
 async function persistAnalysis(env, result, inputChars) {
   const db = aiDb(env);
   if (!db) return null;
+  if (!(await encryptionKey(env))) return null;
   const requestId = crypto.randomUUID();
   const output = JSON.stringify({ summary: result.ai && result.ai.summary, topics: result.ai && result.ai.topics || [], entities: result.ai && result.ai.entities || [], algorithmic: result.stats, skeptic: result.skeptic });
   try {
+    const encryptedOutput = await encryptForStorage(env, output);
+    if (!encryptedOutput) return null;
+    const encryptedClaim = result.ai && result.ai.summary ? await encryptForStorage(env, JSON.stringify({ claim: result.ai.summary.slice(0, 1200), evidence: result.ai.entities || [] })) : null;
+    if (result.ai && result.ai.summary && !encryptedClaim) return null;
     const inserted = await db.prepare("INSERT INTO ai_runs (request_id, mode, model, input_chars, output_json, confidence) VALUES (?, ?, ?, ?, ?, ?)")
-      .bind(requestId, result.mode, result.ai ? AI_MODEL : "algorithmic", inputChars, output, result.ai ? 0.5 : null).run();
+      .bind(requestId, result.mode, result.ai ? AI_MODEL : "algorithmic", inputChars, encryptedOutput, result.ai ? 0.5 : null).run();
     const runId = inserted.meta && inserted.meta.last_row_id;
-    if (runId && result.ai && result.ai.summary) {
+    if (runId && result.ai && result.ai.summary && encryptedClaim) {
       await db.prepare("INSERT INTO ai_claims (run_id, claim, claim_type, evidence_json, confidence, verification_status) VALUES (?, ?, ?, ?, ?, ?)")
-        .bind(runId, result.ai.summary.slice(0, 1200), "summary", JSON.stringify(result.ai.entities || []), 0.5, "unverified").run();
+        .bind(runId, "Encrypted analysis claim; decrypt through an authorized dashboard path.", "encrypted-summary", encryptedClaim, 0.5, "unverified").run();
     }
     return runId || requestId;
   } catch { return null; }
@@ -530,6 +535,9 @@ const PAGE = `<!DOCTYPE html>
   <div class="modal-card">
     <h2 id="jurisdiction-title">Configure data-protection profile</h2>
     <p class="muted">Where will Corpora AI process or store customer data? This configures safeguards; it is not a compliance or legal-advice determination.</p>
+    <div class="data-notice"><strong>Why we use customer data:</strong> to analyze submitted text, retrieve related reference material, correlate observations, test authorized synthetic scenarios, produce reports, and maintain an auditable security workflow.</div>
+    <div class="data-notice"><strong>Scope:</strong> data you submit, requested telemetry, configuration choices, security metadata, and optional evaluation output. Raw analysis input is not stored by default. If you opt into persistence, output and claims are stored only when server-side AES-256-GCM encryption is configured; otherwise persistence fails closed.</div>
+    <div class="data-notice"><strong>How it is needed:</strong> the minimum necessary data supports the requested analysis and evidence chain. Retention, residency, legal basis, access, deletion, and transfers remain customer-policy and counsel-controlled.</div>
     <label class="lbl" for="data-region">Processing or storage jurisdiction</label>
     <select id="data-region" class="text-input">
       <option value="US_ONLY">United States only</option>
@@ -544,8 +552,9 @@ const PAGE = `<!DOCTYPE html>
       <option value="NO">No</option>
       <option value="UNKNOWN">Unknown</option>
     </select>
+    <label class="consent"><input id="data-consent" type="checkbox" required> I understand why data is processed, what is in scope, and that legal review may be required for my use case.</label>
     <p class="legal-note">Legal information only. Jurisdiction, legal basis, retention, residency, transfers, and admissibility require customer policy and qualified counsel. Evidence preservation metadata does not guarantee admissibility.</p>
-    <button id="save-jurisdiction" class="cta" type="button">Save profile</button>
+    <button id="save-jurisdiction" class="cta" type="button" disabled>Save profile</button>
   </div>
 </section>
 <main>
@@ -589,7 +598,7 @@ const PAGE_CSS = `:root{--bg:#0b0e14;--card:#12161f;--border:#232a37;--text:#e6e
 [data-theme=light]{--bg:#f7f8fa;--card:#ffffff;--border:#e3e6ec;--text:#1a1d24;--muted:#5b6472;--accent:#6d4de0;--accent-ink:#f4f0ff;--chip:#eef0f5}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
 .nav{display:flex;justify-content:space-between;align-items:center;padding:18px 6vw;border-bottom:1px solid var(--border)}
-.modal{position:fixed;inset:0;z-index:10;display:grid;place-items:center;padding:20px;background:rgba(0,0,0,.72)}.modal[hidden]{display:none}.modal-card{width:min(560px,100%);background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.35)}.modal-card h2{margin-top:0}.modal-label{margin-top:16px}.legal-note{color:var(--muted);font-size:.78rem;border-left:3px solid var(--accent);padding-left:10px;margin:16px 0}
+.modal{position:fixed;inset:0;z-index:10;display:grid;place-items:center;padding:20px;background:rgba(0,0,0,.72)}.modal[hidden]{display:none}.modal-card{width:min(560px,100%);background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.35)}.modal-card h2{margin-top:0}.modal-label{margin-top:16px}.data-notice{background:var(--chip);border:1px solid var(--border);border-radius:8px;padding:10px;margin:10px 0;color:var(--muted);font-size:.82rem}.data-notice strong{color:var(--text)}.legal-note{color:var(--muted);font-size:.78rem;border-left:3px solid var(--accent);padding-left:10px;margin:16px 0}
 .brand{color:var(--text);text-decoration:none;font-weight:700;font-size:1.15rem;letter-spacing:.02em}
 .brand span{color:var(--accent)}
 .icon-btn{background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:1rem;padding:6px 12px;cursor:pointer}
@@ -656,7 +665,11 @@ const savedJurisdiction = localStorage.getItem("corpora-jurisdiction-profile");
 if (savedJurisdiction) {
   try { renderJurisdiction(JSON.parse(savedJurisdiction)); } catch { jurisdictionPrompt.hidden = false; }
 } else jurisdictionPrompt.hidden = false;
+const dataConsent = $("data-consent");
+const saveJurisdiction = $("save-jurisdiction");
+dataConsent.addEventListener("change", () => { saveJurisdiction.disabled = !dataConsent.checked; });
 $("save-jurisdiction").addEventListener("click", () => {
+  if (!dataConsent.checked) return;
   const profile = { region: $("data-region").value, euPersonalData: $("eu-personal-data").value, configuredAt: new Date().toISOString(), source: "customer-declared", ipInference: false };
   localStorage.setItem("corpora-jurisdiction-profile", JSON.stringify(profile));
   renderJurisdiction(profile); jurisdictionPrompt.hidden = true;
@@ -786,7 +799,7 @@ export default {
       if (url.pathname === "/" || url.pathname === "/index.html") return asset(PAGE, "text/html; charset=utf-8");
       if (url.pathname === "/style.css") return asset(PAGE_CSS, "text/css; charset=utf-8");
       if (url.pathname === "/app.js") return asset(PAGE_JS, "application/javascript; charset=utf-8");
-      if (url.pathname === "/health") return json({ ok: true, service: "corpora-ai", mode: env.AI ? "ai+algorithmic" : "algorithmic", corporaDb: !!env.DB, aiMemoryDb: !!aiDb(env), encryptedMemory: !!env.AI_MEMORY_ENCRYPTION_KEY, model: AI_MODEL });
+      if (url.pathname === "/health") return json({ ok: true, service: "corpora-ai", mode: env.AI ? "ai+algorithmic" : "algorithmic", corporaDb: !!env.DB, aiMemoryDb: !!aiDb(env), encryptedMemory: !!(await encryptionKey(env)), model: AI_MODEL });
     }
     if (request.method === "POST" && url.pathname === "/api/analyze") return handleAnalyze(request, env);
     if (request.method === "POST" && url.pathname === "/api/corpora/ingest") return handleIngest(request, env);

@@ -121,4 +121,6 @@ See [THREAT-MODEL.md](THREAT-MODEL.md) for the security-platform threat model co
 
 See [docs/EVIDENCE-LEGAL-GOVERNANCE.md](docs/EVIDENCE-LEGAL-GOVERNANCE.md), the [evidence-governance contract](contracts/evidence-governance.v1.json), and the [versioned legal-source registry](contracts/legal-sources.v1.json) for best-evidence preservation, chain of custody, integrity verification, Michigan and federal legal limitations, authorization gates, legal holds, and the customer-configured European data-protection profile.
 
+See [docs/CUSTOMER-DATA-PIPELINE.md](docs/CUSTOMER-DATA-PIPELINE.md) for the customer-facing explanation of why data is processed, what is in scope, how encryption works, and the distinction between server-side encryption at rest and true end-to-end encryption.
+
 See [docs/INVESTIGATION-WORKSTATION.md](docs/INVESTIGATION-WORKSTATION.md) and the [versioned workstation contract](contracts/investigation-workstation.v1.json) for the human-versus-AI product boundary, evidence-centered reasoning loop, hypothesis fields, controlled experiments, and approval requirements.
