@@ -526,10 +526,33 @@ const PAGE = `<!DOCTYPE html>
   <a class="brand" href="/">Corpora <span>AI</span></a>
   <button id="theme-toggle" class="icon-btn" type="button" aria-label="Toggle theme"></button>
 </header>
+<section id="jurisdiction-prompt" class="modal" hidden aria-labelledby="jurisdiction-title" role="dialog" aria-modal="true">
+  <div class="modal-card">
+    <h2 id="jurisdiction-title">Configure data-protection profile</h2>
+    <p class="muted">Where will Corpora AI process or store customer data? This configures safeguards; it is not a compliance or legal-advice determination.</p>
+    <label class="lbl" for="data-region">Processing or storage jurisdiction</label>
+    <select id="data-region" class="text-input">
+      <option value="US_ONLY">United States only</option>
+      <option value="EU_EEA">European Union / EEA</option>
+      <option value="UK">United Kingdom</option>
+      <option value="MULTIPLE">Multiple jurisdictions</option>
+      <option value="UNKNOWN">Unknown</option>
+    </select>
+    <label class="lbl modal-label" for="eu-personal-data">Will Corpora AI process personal data belonging to people in the EU/EEA?</label>
+    <select id="eu-personal-data" class="text-input">
+      <option value="YES">Yes</option>
+      <option value="NO">No</option>
+      <option value="UNKNOWN">Unknown</option>
+    </select>
+    <p class="legal-note">Legal information only. Jurisdiction, legal basis, retention, residency, transfers, and admissibility require customer policy and qualified counsel. Evidence preservation metadata does not guarantee admissibility.</p>
+    <button id="save-jurisdiction" class="cta" type="button">Save profile</button>
+  </div>
+</section>
 <main>
   <section class="hero">
     <h1>Paste a corpus.<br>Get the intelligence out.</h1>
     <p class="sub">Summary, entities, topics, key terms and readability &mdash; Workers AI plus an algorithmic pass, in one request.</p>
+    <p id="legal-profile-status" class="tagline"></p>
   </section>
   <section class="input-card">
     <label class="lbl" for="input">Your text corpus (up to 32KB)</label>
@@ -566,6 +589,7 @@ const PAGE_CSS = `:root{--bg:#0b0e14;--card:#12161f;--border:#232a37;--text:#e6e
 [data-theme=light]{--bg:#f7f8fa;--card:#ffffff;--border:#e3e6ec;--text:#1a1d24;--muted:#5b6472;--accent:#6d4de0;--accent-ink:#f4f0ff;--chip:#eef0f5}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
 .nav{display:flex;justify-content:space-between;align-items:center;padding:18px 6vw;border-bottom:1px solid var(--border)}
+.modal{position:fixed;inset:0;z-index:10;display:grid;place-items:center;padding:20px;background:rgba(0,0,0,.72)}.modal[hidden]{display:none}.modal-card{width:min(560px,100%);background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.35)}.modal-card h2{margin-top:0}.modal-label{margin-top:16px}.legal-note{color:var(--muted);font-size:.78rem;border-left:3px solid var(--accent);padding-left:10px;margin:16px 0}
 .brand{color:var(--text);text-decoration:none;font-weight:700;font-size:1.15rem;letter-spacing:.02em}
 .brand span{color:var(--accent)}
 .icon-btn{background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:1rem;padding:6px 12px;cursor:pointer}
@@ -619,6 +643,23 @@ setTheme(localStorage.getItem("corpora-theme") || "dark");
 btn.addEventListener("click", () => {
   const t = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
   localStorage.setItem("corpora-theme", t); setTheme(t);
+});
+
+/* Jurisdiction is customer-provided configuration; never infer it from IP geolocation. */
+const jurisdictionPrompt = $("jurisdiction-prompt");
+const jurisdictionStatus = $("legal-profile-status");
+const renderJurisdiction = (profile) => {
+  const euMode = profile.region === "EU_EEA" || profile.euPersonalData === "YES";
+  jurisdictionStatus.textContent = "Data-protection profile: " + (euMode ? "EUROPEAN DATA-PROTECTION MODE" : profile.region === "UNKNOWN" || profile.euPersonalData === "UNKNOWN" ? "UNVERIFIED — legal review recommended" : profile.region) + ". Legal review required where facts or jurisdiction matter.";
+};
+const savedJurisdiction = localStorage.getItem("corpora-jurisdiction-profile");
+if (savedJurisdiction) {
+  try { renderJurisdiction(JSON.parse(savedJurisdiction)); } catch { jurisdictionPrompt.hidden = false; }
+} else jurisdictionPrompt.hidden = false;
+$("save-jurisdiction").addEventListener("click", () => {
+  const profile = { region: $("data-region").value, euPersonalData: $("eu-personal-data").value, configuredAt: new Date().toISOString(), source: "customer-declared", ipInference: false };
+  localStorage.setItem("corpora-jurisdiction-profile", JSON.stringify(profile));
+  renderJurisdiction(profile); jurisdictionPrompt.hidden = true;
 });
 
 $("analyze").addEventListener("click", async () => {

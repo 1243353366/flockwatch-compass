@@ -119,4 +119,6 @@ See [AUDIT-REPORT.md](AUDIT-REPORT.md) for the adversarial syntax, runtime, depl
 
 See [THREAT-MODEL.md](THREAT-MODEL.md) for the security-platform threat model covering telemetry poisoning, untrusted evidence and prompt injection, collector compromise, range escape, resource exhaustion, audit evasion, and recovery trust.
 
+See [docs/EVIDENCE-LEGAL-GOVERNANCE.md](docs/EVIDENCE-LEGAL-GOVERNANCE.md), the [evidence-governance contract](contracts/evidence-governance.v1.json), and the [versioned legal-source registry](contracts/legal-sources.v1.json) for best-evidence preservation, chain of custody, integrity verification, Michigan and federal legal limitations, authorization gates, legal holds, and the customer-configured European data-protection profile.
+
 See [docs/INVESTIGATION-WORKSTATION.md](docs/INVESTIGATION-WORKSTATION.md) and the [versioned workstation contract](contracts/investigation-workstation.v1.json) for the human-versus-AI product boundary, evidence-centered reasoning loop, hypothesis fields, controlled experiments, and approval requirements.

@@ -214,3 +214,8 @@ Python syntax, JSON configuration, Worker syntax, forbidden-primitive scanning, 
 ## [2026-09-19] — Investigation workstation contract
 
 Added `docs/INVESTIGATION-WORKSTATION.md` and `contracts/investigation-workstation.v1.json`. The contract separates human responsibilities from AI reasoning, defines the retrieve/verify/correlate/challenge/hypothesize/test/explain/recommend/preserve-provenance loop, requires observed-versus-inferred claim levels and competing hypotheses, treats telemetry gaps as uncertainty rather than absence of threats, and requires human authorization for high-impact defensive actions. It also formalizes the controlled experiment and simulation-learning loop without granting the AI operational authority.
+
+
+## [2026-09-19] — Evidence and legal governance layer
+
+Added versioned evidence-governance and legal-source contracts, plus documentation for original-versus-derived artifacts, SHA-256 integrity verification, append-oriented chain of custody, legal holds, claim-level separation, authorization gates, Michigan and federal legal-information limitations, and customer-policy-dependent retention. The dashboard now asks customers where data will be processed or stored and whether EU/EEA personal data is involved. It enables **EUROPEAN DATA-PROTECTION MODE** from customer-declared configuration without inferring location from IP addresses and without claiming GDPR compliance. The UI explicitly states that hashing and custody metadata do not guarantee admissibility and that legal conclusions require qualified counsel.
