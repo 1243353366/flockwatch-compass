@@ -10,6 +10,16 @@ third-party upstream material (e.g. MITRE ATT&CK STIX data, ahmia-crawler,
 clinical-nlp-pipeline) strictly with attribution: each record keeps its
 upstream project, repository URL, license, and author information.
 
+## Launch directly from GitHub
+
+Use these links to bypass the in-app setup flow:
+
+- **Open in GitHub Codespaces:** [Launch Corpora AI in your browser](https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=1243353366%2Fcorpora-ai)
+- **Download the repository ZIP:** [Download Corpora AI](https://github.com/1243353366/corpora-ai/archive/refs/heads/main.zip)
+- **Browse the source:** [github.com/1243353366/corpora-ai](https://github.com/1243353366/corpora-ai)
+
+Codespaces uses the checked-in `.devcontainer/devcontainer.json`: Node.js 24 is provisioned, dependencies are installed, the self-host adapter starts on port `8787`, and GitHub forwards that port to a browser tab. The first launch may require GitHub authentication and Codespaces availability. For a local download, run `npm ci && npm start`, then open `http://localhost:8787`.
+
 ## Research-Use Policy
 
 Corpora AI analyzes offensive cyber material strictly as research data.
