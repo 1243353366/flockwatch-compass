@@ -71,7 +71,7 @@ The external knowledge seed is deliberately curated around [MITRE ATT&CK](https:
 
 ## Wrangler release hardening
 
-The canonical `wrangler.toml` now declares Node 24-compatible Workers support, `nodejs_compat`, minification, disabled anonymous Wrangler metrics, and Workers observability. GitHub Actions uses Node 24 LTS, installs Wrangler 4 explicitly, applies the additive D1 schema, and deploys only after the schema step succeeds. The schema is idempotent and uses `CREATE TABLE IF NOT EXISTS` / `INSERT OR IGNORE` for safe replay.
+The canonical `wrangler.toml` now declares Node 24-compatible Workers support, `nodejs_compat`, minification, disabled anonymous Wrangler metrics, and Workers observability. GitHub Actions reads Node 24 from `.nvmrc`, installs the locked dependency set with `npm ci`, uses the pinned Wrangler through `npm exec`, applies the additive D1 schema, and deploys only after the schema step succeeds. The schema is idempotent and uses `CREATE TABLE IF NOT EXISTS` / `INSERT OR IGNORE` for safe replay. See the [architecture map](ARCHITECTURE-MAP.md) for canonical file ownership and boundary status.
 
 
 ## Self-hosted preview
