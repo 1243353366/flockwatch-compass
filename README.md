@@ -24,6 +24,14 @@ transform retrieved material into instructions for attacking real systems.
 - `POST /api/corpora/ingest` - Bearer-token ingestion into the shared D1 (`blog_db`, `corpora` table)
 - `GET /api/corpora/search?q=` - keyword search over the corpus, JSON results
 - `GET /health` - service status
+- `POST /api/research/fetch` - consent-gated public HTTPS retrieval with robots checks, redirect provenance, extracted evidence, links, and prompt-injection warnings
+- `POST /api/research/location` - explicit-consent country-level resolution from request metadata; never collects or stores Wi-Fi, cellular, precise coordinates, or device fingerprints
+- `GET /api/tools/catalog` - complete catalog of 100 bounded cybersecurity, research, privacy, and device-defense tools with policy envelopes
+- `POST /api/tools/authorize` - universal policy gate; authorizes scope only and never executes arbitrary commands or external side effects
+- `POST /api/login/key/issue` - generate a temporary one-time API key
+- `POST /api/login/key/verify` - exchange the one-time key for a temporary in-memory session
+- `POST /api/login/provider` - report provider connector status without requesting credentials in the Worker
+- `POST /api/ads/observe` - analyze a user-permitted ad observation with session-only retention
 
 ## Deploy
 
@@ -35,6 +43,24 @@ npm exec -- wrangler deploy
 ```
 
 The repository pins the supported runtime to **Node.js 24** through `engines.node` and `.nvmrc`, and pins Wrangler through `package-lock.json`; CI installs both with `npm ci` rather than a global or temporary CLI.
+
+## Embedded research browser
+
+The dashboard includes a bounded research-browser interface for public-web investigation. The workflow is **user authorization → research plan → browser retrieval → source validation → evidence extraction → correlation → contradiction check → investigation graph → report**. Retrieval accepts only public HTTPS URLs, rejects credentials and private hosts, checks `robots.txt`, follows at most three validated redirects, caps responses at 128KB, and records the requested URL, final URL, timestamp, status, content type, redirect chain, robots result, links, and provenance label. Authentication boundaries, CAPTCHAs, paywalls, rate limits, and anti-bot controls are not bypassed.
+
+Webpage text is always marked as untrusted evidence. The Worker flags common prompt-injection patterns and explicitly tells the agent that webpage content is never an instruction, policy, credential, or authorization. The browser does not grant unrestricted collection authority or permission to gather arbitrary personal information.
+
+Coarse country/region resolution is a separate, visible opt-in control. It uses request metadata only after the user checks consent, is returned with `stored: false`, and does not access Wi-Fi identifiers, cellular identifiers, precise coordinates, or device fingerprints. Location should be used only when it materially helps the declared investigation.
+
+## Bounded 100-tool registry
+
+The dashboard exposes all 100 requested tools across the cybersecurity/research and privacy/device-defense groups. Each catalog entry declares its purpose, read-only status, user-authorization requirement, target scope, data classes, geographic scope, external-side-effect policy, retention behavior, provenance requirement, rate limit, simulation-only status, escalation requirement, and authorization boundary. The universal gate denies missing authorization, denies simulation tools outside an explicitly authorized synthetic target, and requires human review for sensitive or simulation-scoped tools. The registry is a capability contract, not a claim that every tool has an unrestricted implementation; only the public research browser is currently execution-backed, while the remaining entries are safely catalogued for staged implementation.
+
+## Login and ad-observation privacy lab
+
+The dashboard includes a login portal offering iCloud, GitHub, Gmail, work email, YouTube, and a generated one-time API key. Provider buttons currently report that separately registered OAuth connectors are required; the Worker does not collect provider passwords or silently request mailbox, message, contact, or account-history access. The one-time API-key path returns a key once, stores only its hash in the Worker isolate for ten minutes, and exchanges it for a temporary session.
+
+After login, ad analysis requires separate consent, a declared source, the restricted scope `ad-observations-only`, and `session-only` retention. The current safe implementation analyzes an ad label or description supplied by the user and returns likely targeting categories, possible signals, advertiser information if visibly supplied, unknowns, and next steps. It does not claim to inspect a user's private account feed automatically, and it does not store a personal advertising profile. Production provider connections should use narrowly scoped OAuth grants and platform-approved ad-transparency or preference APIs.
 
 `GET /api/edr/health` reports server-derived `telemetryTrust` (`VERIFIED`, `DEGRADED`, or `UNVERIFIED`) alongside freshness, heartbeat, duplicate, rejection, authentication-failure, and timestamp-quality metrics. `visibility` remains explicit: `container-local`, `host-level`, `synthetic`, or `unknown`.
 

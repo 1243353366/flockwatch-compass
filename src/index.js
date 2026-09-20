@@ -586,6 +586,21 @@ const PAGE = `<!DOCTYPE html>
     <p class="sub">Summary, entities, topics, key terms and readability &mdash; Workers AI plus an algorithmic pass, in one request.</p>
     <p id="legal-profile-status" class="tagline"></p>
   </section>
+  <section class="input-card" id="login-portal">
+    <div class="lbl">Login portal &middot; ad-observation privacy lab</div>
+    <p class="muted">Login is only the identity step. Corpora will not read mailbox contents, contacts, messages, passwords, precise location, Wi-Fi, cellular, or device fingerprints. Ad analysis accepts only permitted ad observations.</p>
+    <div class="provider-grid"><button class="cta secondary provider-login" data-provider="iCloud" type="button">iCloud</button><button class="cta secondary provider-login" data-provider="GitHub" type="button">GitHub</button><button class="cta secondary provider-login" data-provider="Gmail" type="button">Gmail</button><button class="cta secondary provider-login" data-provider="Work email" type="button">Work email</button><button class="cta secondary provider-login" data-provider="YouTube" type="button">YouTube</button></div>
+    <div class="data-notice"><strong>One-time API key:</strong> generate a temporary key when no provider connector is configured. The plaintext is shown once, then only its hash is held until expiry.</div>
+    <div class="row"><button id="issue-api-key" class="cta" type="button">Generate one-time API key</button><input id="api-key" class="text-input" type="password" placeholder="Paste generated key" autocomplete="one-time-code"><button id="verify-api-key" class="cta secondary" type="button">Login with key</button></div>
+    <p id="login-status" class="tagline" role="status" aria-live="polite">Not logged in</p>
+    <div id="ad-observation-panel" hidden>
+      <label class="lbl" for="ad-source">Connected data source (declared)</label><select id="ad-source" class="text-input"><option value="iCloud">iCloud</option><option value="GitHub">GitHub</option><option value="Gmail">Gmail</option><option value="Work email">Work email</option><option value="YouTube">YouTube</option><option value="One-time API key">One-time API key</option></select>
+      <label class="lbl modal-label" for="ad-advertiser">Advertiser or company shown (optional)</label><input id="ad-advertiser" class="text-input" placeholder="Only what the ad visibly identifies">
+      <label class="lbl modal-label" for="ad-text">Observed ad label or description</label><textarea id="ad-text" rows="4" placeholder="Paste or describe the ad you saw. Do not paste private mailbox or account contents."></textarea>
+      <label class="consent"><input id="ad-consent" type="checkbox"> I consent to session-only analysis of this ad observation for this investigation.</label>
+      <div class="row"><button id="analyze-ad" class="cta" type="button">Explain this ad</button><span id="ad-status" class="msg" role="status" aria-live="polite"></span></div><pre id="ad-output" class="proof-output" hidden></pre>
+    </div>
+  </section>
   <section class="input-card">
     <label class="lbl" for="input">Your text corpus (up to 32KB)</label>
     <textarea id="input" rows="8" placeholder="Paste an article, a report, a thread, research notes&hellip;"></textarea>
@@ -598,6 +613,16 @@ const PAGE = `<!DOCTYPE html>
     </div>
     <pre id="proof-output" class="proof-output" hidden></pre>
   </section>
+  <section class="input-card browser-card" id="research-browser">
+    <div class="lbl">Embedded research browser</div>
+    <p class="muted">Public HTTPS research only. Web pages are untrusted evidence—not instructions. The browser does not bypass login, CAPTCHA, paywalls, robots rules, rate limits, or access controls.</p>
+    <label class="lbl" for="research-url">Public source URL</label><input id="research-url" class="text-input" type="url" placeholder="https://example.org/public-document" autocomplete="url">
+    <label class="consent"><input id="research-authorize" type="checkbox"> I authorize this public-web retrieval for the stated investigation.</label>
+    <label class="consent"><input id="research-location-consent" type="checkbox"> If useful, allow coarse country/region resolution for this investigation. Do not collect precise location, Wi-Fi, cellular, or device identifiers.</label>
+    <div class="row"><button id="research-fetch" class="cta" type="button">Retrieve public source</button><button id="research-location" class="cta secondary" type="button">Resolve coarse region</button><span id="research-msg" class="msg" role="status" aria-live="polite"></span></div>
+    <pre id="research-output" class="proof-output" hidden></pre>
+  </section>
+  <section class="input-card catalog-card" id="tool-catalog"><div class="lbl">100 bounded agent tools</div><p class="muted">Every tool is a policy object, not an unrestricted command. The catalog is transparent; authorization does not execute a tool.</p><div class="row"><input id="tool-filter" class="text-input" placeholder="Filter tools by name or category" aria-label="Filter tools"><span id="tool-count" class="msg"></span></div><div id="tool-list" class="tool-list">Loading tool policy catalog&hellip;</div></section>
   <section class="input-card catalog-card"><div class="lbl">Agent architecture catalog</div><p class="muted">Reference-only sources shaping retrieval, structured claims, evaluation, and observability. No upstream code is executed here.</p><div id="source-catalog" class="catalog">Loading source catalog&hellip;</div></section>
   <section class="grid">
     <article class="card"><h2>Customer privacy controls</h2><p class="muted">Use the run ID and private access token returned when you opted into persistence. Export returns encrypted output; deletion removes the run, claims, feedback, and access credential.</p><label class="lbl" for="privacy-run-id">Run ID</label><input id="privacy-run-id" class="text-input" inputmode="numeric" autocomplete="off" placeholder="e.g. 12"><label class="lbl modal-label" for="privacy-token">Access token</label><input id="privacy-token" class="text-input" type="password" autocomplete="off" placeholder="Paste the private token"><div class="row"><button id="privacy-export" class="cta secondary" type="button">Export encrypted run</button><button id="privacy-delete" class="cta secondary" type="button">Delete run</button></div><pre id="privacy-run-output" class="proof-output" hidden></pre></article>
@@ -646,6 +671,8 @@ textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
 .consent{display:flex;gap:8px;align-items:flex-start;color:var(--muted);font-size:.82rem;margin-top:12px}
 .consent input{accent-color:var(--accent);margin-top:5px}
 .catalog-card{margin-top:18px}.catalog{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}.source{background:var(--chip);border:1px solid var(--border);border-radius:10px;padding:10px}.source a{color:var(--text);font-weight:600;text-decoration:none}.source small{display:block;color:var(--muted);font-size:.75rem;margin-top:3px}
+.tool-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-top:14px}.tool{background:var(--chip);border:1px solid var(--border);border-radius:10px;padding:12px}.tool-head{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.tool p{color:var(--muted);font-size:.82rem;margin:8px 0}.tool small{display:block;color:var(--muted);font-size:.72rem;margin-top:5px}
+.provider-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:14px 0}.provider-login{padding:10px 12px}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
 .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;min-width:0}
 .card h2{font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 12px}
@@ -731,11 +758,79 @@ async function privacyRequest(method, path) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Privacy request failed (" + res.status + ")");
     output.hidden = false; output.textContent = JSON.stringify(data, null, 2);
-    if (method === "DELETE") { $("privacy-token").value = ""; output.textContent += "\n\nThe access token was cleared from this page."; }
+    if (method === "DELETE") { $("privacy-token").value = ""; output.textContent += "\\n\\nThe access token was cleared from this page."; }
   } catch (e) { output.hidden = false; output.textContent = e.message; }
 }
 $("privacy-export").addEventListener("click", () => privacyRequest("POST", "/api/privacy/export"));
 $("privacy-delete").addEventListener("click", () => privacyRequest("DELETE", "/api/privacy/run"));
+
+$("research-fetch").addEventListener("click", async () => {
+  const msg = $("research-msg");
+  const output = $("research-output");
+  const url = $("research-url").value.trim();
+  if (!$("research-authorize").checked) { msg.textContent = "Explicit authorization is required before retrieval."; return; }
+  if (!url) { msg.textContent = "Enter a public HTTPS source URL."; return; }
+  $("research-fetch").disabled = true; msg.textContent = "Retrieving public source and checking robots policy…";
+  try {
+    const res = await fetch("/api/research/fetch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url, authorized: true, purpose: "customer-declared research" }) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Research retrieval failed (" + res.status + ")");
+    output.hidden = false; output.textContent = JSON.stringify(data, null, 2);
+    msg.textContent = data.safety && data.safety.promptInjectionSuspected ? "Retrieved as untrusted evidence; possible prompt injection was flagged." : "Retrieved as unverified public evidence. Review provenance and contradictions before relying on it.";
+  } catch (e) { output.hidden = false; output.textContent = e.message; msg.textContent = "Retrieval did not complete."; }
+  $("research-fetch").disabled = false;
+});
+
+$("research-location").addEventListener("click", async () => {
+  const msg = $("research-msg");
+  const output = $("research-output");
+  if (!$("research-location-consent").checked) { msg.textContent = "Coarse region lookup requires explicit consent."; return; }
+  try {
+    const res = await fetch("/api/research/location", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ consent: true, purpose: "customer-declared research" }) });
+    const data = await res.json();
+    output.hidden = false; output.textContent = JSON.stringify(data, null, 2);
+    msg.textContent = data.location ? "Coarse country/region resolved; it was not stored." : "Coarse region is unavailable; no precise location was collected.";
+  } catch (e) { msg.textContent = "Location lookup unavailable."; }
+});
+
+let toolCatalog = [];
+const renderTools = () => {
+  const filter = $("tool-filter").value.trim().toLowerCase();
+  const visible = toolCatalog.filter((tool) => !filter || (tool.name + " " + tool.category + " " + tool.targetScope).toLowerCase().includes(filter));
+  $("tool-count").textContent = visible.length + " of " + toolCatalog.length + " tools";
+  $("tool-list").innerHTML = visible.map((tool) => '<article class="tool"><div class="tool-head"><b>' + String(tool.number).padStart(2, "0") + " · " + esc(tool.name) + '</b><span class="chip">' + esc(tool.category) + '</span></div><p>' + esc(tool.purpose) + '</p><small>scope: ' + esc(tool.targetScope) + ' · data: ' + esc(tool.dataClasses.join(", ")) + ' · ' + (tool.readOnly ? "read-only" : "side-effecting") + ' · authorization: required · escalation: ' + (tool.escalationRequired ? "required" : "not required") + '</small><small>retention: ' + esc(tool.retentionBehavior) + ' · provenance: required · ' + (tool.simulationOnly ? "SIMULATION ONLY" : "bounded analysis") + '</small></article>').join("") || '<p class="muted">No tools match this filter.</p>';
+};
+$("tool-filter").addEventListener("input", renderTools);
+fetch("/api/tools/catalog").then((res) => res.json()).then((data) => { toolCatalog = data.tools || []; renderTools(); }).catch(() => { $("tool-list").textContent = "Tool policy catalog unavailable."; });
+
+let adSessionToken = "";
+const loginStatus = $("login-status");
+document.querySelectorAll(".provider-login").forEach((button) => button.addEventListener("click", async () => {
+  const provider = button.dataset.provider;
+  const res = await fetch("/api/login/provider", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider }) });
+  const data = await res.json();
+  loginStatus.textContent = data.message || data.next || (data.ok ? provider + " login ready." : "Provider login unavailable.");
+}));
+$("issue-api-key").addEventListener("click", async () => {
+  const res = await fetch("/api/login/key/issue", { method: "POST" });
+  const data = await res.json();
+  if (!res.ok) { loginStatus.textContent = data.error || "Key generation failed."; return; }
+  $("api-key").type = "text"; $("api-key").value = data.apiKey; loginStatus.textContent = "One-time key generated. Copy it or use Login with key; it expires in 10 minutes.";
+});
+$("verify-api-key").addEventListener("click", async () => {
+  const apiKey = $("api-key").value.trim();
+  const res = await fetch("/api/login/key/verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ apiKey }) });
+  const data = await res.json();
+  if (!res.ok) { loginStatus.textContent = data.error || "Login failed."; return; }
+  adSessionToken = data.sessionToken; $("ad-observation-panel").hidden = false; loginStatus.textContent = "Logged in with a temporary session. Explicit ad-observation consent is still required."; $("api-key").value = ""; $("api-key").type = "password";
+});
+$("analyze-ad").addEventListener("click", async () => {
+  const status = $("ad-status"); const output = $("ad-output");
+  if (!adSessionToken) { status.textContent = "Login required."; return; }
+  if (!$("ad-consent").checked) { status.textContent = "Explicit session-only ad-observation consent is required."; return; }
+  const res = await fetch("/api/ads/observe", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + adSessionToken }, body: JSON.stringify({ source: $("ad-source").value, advertiser: $("ad-advertiser").value, adText: $("ad-text").value, consent: true, dataScope: "ad-observations-only", retention: "session-only" }) });
+  const data = await res.json(); output.hidden = false; output.textContent = JSON.stringify(data, null, 2); status.textContent = res.ok ? "Ad observation analyzed without persistence." : (data.error || "Ad analysis failed.");
+});
 
 $("proof").addEventListener("click", async () => {
   const text = $("input").value.trim();
@@ -881,6 +976,14 @@ export default {
     if (request.method === "POST" && url.pathname === "/api/analyze") return handleAnalyze(request, env);
     if (request.method === "POST" && url.pathname === "/api/privacy/export") return handlePrivacyExport(request, env);
     if (request.method === "DELETE" && url.pathname === "/api/privacy/run") return handlePrivacyDelete(request, env);
+    if (request.method === "POST" && url.pathname === "/api/research/fetch") return handleResearchFetch(request, env);
+    if (request.method === "POST" && url.pathname === "/api/research/location") return handleResearchLocation(request, env);
+    if (request.method === "GET" && url.pathname === "/api/tools/catalog") return handleToolCatalog(request, env);
+    if (request.method === "POST" && url.pathname === "/api/tools/authorize") return handleToolAuthorization(request, env);
+    if (request.method === "POST" && url.pathname === "/api/login/key/issue") return handleKeyIssue(request, env);
+    if (request.method === "POST" && url.pathname === "/api/login/key/verify") return handleKeyVerify(request, env);
+    if (request.method === "POST" && url.pathname === "/api/login/provider") return handleProviderLogin(request, env);
+    if (request.method === "POST" && url.pathname === "/api/ads/observe") return handleAdObservation(request, env);
     if (request.method === "POST" && url.pathname === "/api/corpora/ingest") return handleIngest(request, env);
     if (request.method === "GET" && url.pathname === "/api/corpora/search") return handleCorporaSearch(request, env);
     if (request.method === "GET" && url.pathname === "/api/corpora/sources") return handleSourceCatalog(request, env);
@@ -1013,3 +1116,265 @@ async function handlePrivacyDelete(request, env) {
 }
 
 /* ---------- privacy controls ---------- */
+
+
+/* ---------- safe public-web research browser ---------- */
+
+const RESEARCH_MAX_BYTES = 128 * 1024;
+const RESEARCH_MAX_REDIRECTS = 3;
+const PRIVATE_HOST_RE = /^(localhost|.*\.localhost|127(?:\.\d{1,3}){3}|0\.0\.0\.0|::1|\[::1\]|10(?:\.\d{1,3}){3}|192\.168(?:\.\d{1,3}){2}|172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})$/i;
+const INJECTION_RE = /(ignore|disregard|forget)\s+(all|any|previous|prior)\s+(instructions|rules)|system\s+message|developer\s+message|reveal\s+(your|the)\s+(prompt|secrets|credentials)|click\s+this\s+link\s+to\s+continue/i;
+
+function researchUrl(value) {
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== "https:") return null;
+    if (parsed.username || parsed.password || PRIVATE_HOST_RE.test(parsed.hostname)) return null;
+    if (parsed.port && parsed.port !== "443") return null;
+    parsed.hash = "";
+    return parsed;
+  } catch { return null; }
+}
+
+function htmlToResearchText(html) {
+  return String(html)
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">")
+    .replace(/\s+/g, " ").trim();
+}
+
+function researchLinks(html, base) {
+  const links = [];
+  const seen = new Set();
+  const re = /<a\b[^>]*href=["']([^"']+)["'][^>]*>/gi;
+  let match;
+  while ((match = re.exec(html)) && links.length < 30) {
+    try {
+      const target = new URL(match[1], base);
+      if (target.protocol !== "https:" || target.username || target.password || PRIVATE_HOST_RE.test(target.hostname)) continue;
+      target.hash = "";
+      const href = target.toString();
+      if (!seen.has(href)) { seen.add(href); links.push(href); }
+    } catch { /* malformed links are ignored */ }
+  }
+  return links;
+}
+
+async function allowedByRobots(target) {
+  try {
+    const robotsUrl = new URL("/robots.txt", target.origin);
+    const response = await fetch(robotsUrl, { headers: { "user-agent": "CorporaAI-Research/1.0 (+public-research; respects robots.txt)" } });
+    if (!response.ok) return { checked: true, allowed: true, status: response.status };
+    const text = (await response.text()).slice(0, 20000);
+    let applies = false;
+    let disallowed = [];
+    for (const raw of text.split(/\r?\n/)) {
+      const line = raw.split("#")[0].trim();
+      const separator = line.indexOf(":");
+      if (separator < 0) continue;
+      const key = line.slice(0, separator).trim().toLowerCase();
+      const value = line.slice(separator + 1).trim();
+      if (key === "user-agent") applies = value === "*" || /corpora/i.test(value);
+      if (applies && key === "disallow" && value) disallowed.push(value);
+    }
+    const path = target.pathname || "/";
+    const blocked = disallowed.some((rule) => rule === "/" || path.startsWith(rule));
+    return { checked: true, allowed: !blocked, status: response.status, matchedRules: blocked ? disallowed : [] };
+  } catch { return { checked: false, allowed: false, status: null, reason: "robots.txt could not be checked" }; }
+}
+
+async function handleResearchFetch(request, env) {
+  const ip = request.headers.get("cf-connecting-ip") || "research-unknown";
+  if (rateLimited("research:" + ip)) return json({ error: "Research rate limit exceeded; try again later." }, 429);
+  let body;
+  try { body = await request.json(); } catch { return json({ error: "Invalid JSON body." }, 400); }
+  if (body.authorized !== true) return json({ error: "Explicit user authorization is required before public-web retrieval." }, 400);
+  const requested = researchUrl(body.url);
+  if (!requested) return json({ error: "Only public HTTPS URLs without credentials, private hosts, or non-standard ports are allowed." }, 400);
+  const robots = await allowedByRobots(requested);
+  if (!robots.allowed) return json({ error: "Retrieval blocked by robots.txt or robots policy could not be verified.", requestedUrl: requested.toString(), robots }, 403);
+  let current = requested;
+  let response;
+  const redirectChain = [];
+  for (let hop = 0; hop <= RESEARCH_MAX_REDIRECTS; hop++) {
+    try {
+      response = await fetch(current, { redirect: "manual", headers: { "accept": "text/html,text/plain,application/json;q=0.8", "user-agent": "CorporaAI-Research/1.0 (+public-research; no login or bypass)" } });
+    } catch { return json({ error: "Public source could not be retrieved; no retry or bypass was attempted.", requestedUrl: requested.toString(), redirectChain }, 502); }
+    if (![301, 302, 303, 307, 308].includes(response.status)) break;
+    const location = response.headers.get("location");
+    const next = location && researchUrl(new URL(location, current).toString());
+    if (!next) return json({ error: "Redirect leaves the allowed public HTTPS boundary.", requestedUrl: requested.toString(), redirectChain }, 403);
+    redirectChain.push({ from: current.toString(), to: next.toString(), status: response.status });
+    if (hop === RESEARCH_MAX_REDIRECTS) return json({ error: "Redirect limit reached.", requestedUrl: requested.toString(), redirectChain }, 508);
+    current = next;
+  }
+  const contentLength = Number(response.headers.get("content-length") || 0);
+  if (contentLength > RESEARCH_MAX_BYTES) return json({ error: "Retrieved document exceeds the 128KB research limit.", requestedUrl: requested.toString(), finalUrl: current.toString() }, 413);
+  const raw = (await response.arrayBuffer()).slice(0, RESEARCH_MAX_BYTES);
+  const contentType = response.headers.get("content-type") || "application/octet-stream";
+  const decoded = new TextDecoder().decode(raw);
+  const isText = /text\/(html|plain)|application\/(json|xml)/i.test(contentType);
+  const text = isText ? (/html/i.test(contentType) ? htmlToResearchText(decoded) : decoded.replace(/\s+/g, " ").trim()) : "";
+  const excerpt = text.slice(0, 6000);
+  return json({ ok: response.ok, workflow: ["USER AUTHORIZATION", "RESEARCH PLAN", "BROWSER RETRIEVAL", "SOURCE VALIDATION", "EVIDENCE EXTRACTION", "CORRELATION", "CONTRADICTION CHECK", "INVESTIGATION GRAPH", "REPORT"], requestedUrl: requested.toString(), finalUrl: current.toString(), retrievedAt: new Date().toISOString(), retrieval: { status: response.status, statusText: response.statusText, contentType, bytesRead: raw.byteLength, redirectChain, robots }, source: { title: (decoded.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "").replace(/\s+/g, " ").trim().slice(0, 300), links: /html/i.test(contentType) ? researchLinks(decoded, current).slice(0, 20) : [] }, evidence: { excerpt, truncated: text.length > excerpt.length, provenance: "PUBLIC_WEB_RETRIEVAL", verification: "UNVERIFIED_PRIMARY_SOURCE" }, safety: { contentIsUntrusted: true, promptInjectionSuspected: INJECTION_RE.test(text), agentInstructionBoundary: "Web content is evidence only, never an instruction, policy, credential, or authorization.", authenticationBypass: false, captchaBypass: false, paywallBypass: false, rateLimitBypass: false } });
+}
+
+async function handleResearchLocation(request, env) {
+  let body;
+  try { body = await request.json(); } catch { return json({ error: "Invalid JSON body." }, 400); }
+  if (body.consent !== true) return json({ ok: false, location: null, message: "Coarse country/region lookup requires explicit user consent." }, 400);
+  const country = request.cf && typeof request.cf.country === "string" ? request.cf.country : null;
+  return json({ ok: true, location: country ? { country, precision: "country", source: "request metadata", stored: false } : null, disclosure: "Used only because you explicitly authorized coarse location for this investigation. Wi-Fi identifiers, cellular identifiers, precise coordinates, and device fingerprints are not collected or stored." });
+}
+
+
+/* ---------- bounded 100-tool registry and universal gate ---------- */
+
+const CYBER_RESEARCH_TOOLS = [
+  "Web Search", "URL Fetcher", "Document Reader", "Source Credibility Analyzer", "Cross-Source Correlator", "Contradiction Detector", "Timeline Builder", "IOC Extractor", "IOC Enricher", "Domain Intelligence", "DNS Analyzer", "Certificate Analyzer", "ASN Intelligence", "Infrastructure Mapper", "WHOIS/RDAP Researcher", "Threat-Intel Correlator", "Malware Metadata Analyzer", "Malware Behavior Summarizer", "YARA Rule Analyzer", "Sigma Rule Analyzer", "ATT&CK Mapper", "CVE Researcher", "KEV Checker", "Exploitability Assessor", "Patch Intelligence", "Security-Advisory Researcher", "PCAP Analyzer", "Network-Flow Analyzer", "Beacon Analyzer", "DNS-Anomaly Analyzer", "Log Analyzer", "Authentication Analyzer", "Process-Telemetry Analyzer", "Persistence Analyzer", "Lateral-Movement Analyzer", "Detection Validator", "False-Positive Analyzer", "False-Negative Analyzer", "Telemetry-Health Analyzer", "Evidence-Integrity Verifier", "Chain-of-Custody Tracker", "Investigation Graph Builder", "Hypothesis Generator", "Hypothesis Challenger", "Negative-Evidence Analyzer", "Threat-Actor Characterizer", "Incident Summarizer", "Cyber-Range Controller", "Detection Regression Runner", "Investigation Report Generator",
+];
+
+const PRIVACY_DEVICE_TOOLS = [
+  "Privacy Exposure Scanner", "Data-Broker Directory Search", "Broker Relationship Mapper", "Opt-Out Locator", "Opt-Out Instructions Generator", "Privacy-Policy Analyzer", "Privacy-Policy Diff", "Terms Analyzer", "Data-Collection Classifier", "Data-Sharing Analyzer", "Data-Retention Analyzer", "Data-Deletion Analyzer", "Data-Access Request Generator", "Deletion-Request Generator", "Correction-Request Generator", "Privacy-Rights Navigator", "Consent Audit", "Cookie Analyzer", "Tracker Detector", "Third-Party Script Analyzer", "App Permission Auditor", "Device Permission Auditor", "Location-Access Auditor", "Background-Activity Analyzer", "Network-Connection Viewer", "DNS-Privacy Checker", "Certificate/TLS Checker", "Wi-Fi Security Auditor", "Router Configuration Auditor", "Firewall Status Checker", "Security-Update Checker", "Application-Update Auditor", "Installed-Software Auditor", "Startup-Application Auditor", "Browser-Extension Auditor", "Credential-Exposure Checker", "Password-Hygiene Analyzer", "MFA Auditor", "Account-Security Auditor", "Session Audit", "Device-Telemetry Health Check", "Local EDR Health Check", "Suspicious-Process Detector", "Suspicious-Network-Activity Detector", "Phishing Analyzer", "Scam/Impersonation Analyzer", "Privacy Risk Mapper", "Personal Data Inventory", "Data-Lifecycle Viewer", "Privacy Defense Report",
+];
+
+function toolSlug(name) { return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
+function makeTool(name, index, category) {
+  const simulationOnly = name === "Cyber-Range Controller" || name === "Detection Regression Runner";
+  const sensitive = category === "privacy-device-defense" || /Credential|Password|MFA|Account|Session|Location|Personal Data|Device|Wi-Fi|Router|Firewall|Network-Connection/.test(name);
+  const publicResearch = category === "cybersecurity-research" && !/PCAP|Log|Process|Telemetry|Authentication|Persistence|Lateral|Network-Flow/.test(name);
+  return {
+    id: `${String(index + 1).padStart(3, "0")}-${toolSlug(name)}`,
+    number: index + 1,
+    name,
+    category,
+    purpose: simulationOnly ? "Run a predefined harmless defensive exercise in an authorized isolated range." : `Perform bounded ${name.toLowerCase()} for defensive research and user-authorized analysis.`,
+    readOnly: true,
+    requiresUserAuthorization: true,
+    targetScope: simulationOnly ? "authorized synthetic target only" : (publicResearch ? "public sources only" : (category === "privacy-device-defense" ? "user-owned data or device only" : "authorized evidence only")),
+    dataClasses: sensitive ? ["customer-provided sensitive data", "security metadata"] : ["public research data", "defensive evidence"],
+    geographicScope: sensitive ? "customer-declared jurisdiction; coarse region only when separately consented" : "declared investigation scope",
+    externalSideEffects: false,
+    retentionBehavior: "no raw input by default; retain only explicitly opted-in encrypted outputs and provenance metadata",
+    provenanceRequired: true,
+    rateLimit: "bounded per-request and per-origin rate limits",
+    simulationOnly,
+    escalationRequired: simulationOnly || sensitive,
+    authorizationBoundary: simulationOnly ? "Predefined simulation labels only; no shell, exploit, malware, credential theft, persistence, lateral movement, external C2, or arbitrary target." : "The tool cannot expand scope, infer consent, or turn evidence into authority.",
+    availability: ["URL Fetcher", "Web Search"].includes(name) ? "research-browser-backed" : "catalogued-policy-envelope",
+  };
+}
+
+const TOOL_CATALOG = Object.freeze([
+  ...CYBER_RESEARCH_TOOLS.map((name, index) => makeTool(name, index, "cybersecurity-research")),
+  ...PRIVACY_DEVICE_TOOLS.map((name, index) => makeTool(name, index + CYBER_RESEARCH_TOOLS.length, "privacy-device-defense")),
+]);
+
+function toolGate(tool, body) {
+  if (!tool) return { allowed: false, reason: "Unknown tool identifier." };
+  if (body.authorization !== true) return { allowed: false, reason: "Explicit user authorization is required." };
+  if (tool.simulationOnly && (body.simulationMode !== true || body.targetScope !== "authorized synthetic target")) return { allowed: false, reason: "This tool is restricted to an explicitly authorized synthetic target and predefined simulation mode." };
+  if (tool.externalSideEffects && body.confirmedSideEffect !== true) return { allowed: false, reason: "An explicit side-effect confirmation is required." };
+  if (tool.escalationRequired && body.humanReview !== true) return { allowed: false, reason: "Human review is required for this sensitive or simulation-scoped tool." };
+  return { allowed: true, reason: "Policy envelope satisfied; execution remains limited to the declared scope." };
+}
+
+async function handleToolCatalog() {
+  return json({ ok: true, count: TOOL_CATALOG.length, policy: "Every tool is bounded by purpose, authorization, scope, data class, geography, side effects, retention, provenance, rate limit, simulation status, and escalation requirements.", tools: TOOL_CATALOG });
+}
+
+async function handleToolAuthorization(request) {
+  let body;
+  try { body = await request.json(); } catch { return json({ error: "Invalid JSON body." }, 400); }
+  const tool = TOOL_CATALOG.find((item) => item.id === body.toolId || item.name === body.toolName);
+  const decision = toolGate(tool, body);
+  return json({ ok: decision.allowed, decision: decision.allowed ? "ALLOW" : "DENY", tool: tool || null, reason: decision.reason, execution: "This endpoint authorizes policy only; it does not execute arbitrary commands, scans, exploitation, collection, or external side effects." }, decision.allowed ? 200 : 403);
+}
+
+
+/* ---------- consented login and ad-observation service ---------- */
+
+const LOGIN_KEYS = new Map();
+const LOGIN_SESSIONS = new Map();
+const LOGIN_TTL_MS = 60 * 60 * 1000;
+const LOGIN_PROVIDERS = ["iCloud", "GitHub", "Gmail", "Work email", "YouTube", "One-time API key"];
+
+function newSecret() { return crypto.randomUUID() + "-" + crypto.randomUUID(); }
+function pruneLoginState() {
+  const now = Date.now();
+  for (const [key, item] of LOGIN_KEYS) if (item.expiresAt < now) LOGIN_KEYS.delete(key);
+  for (const [key, item] of LOGIN_SESSIONS) if (item.expiresAt < now) LOGIN_SESSIONS.delete(key);
+}
+async function readJson(request) { try { return await request.json(); } catch { return null; } }
+
+async function handleKeyIssue() {
+  pruneLoginState();
+  const key = newSecret();
+  LOGIN_KEYS.set(await sha256Hex(key), { expiresAt: Date.now() + 10 * 60 * 1000, used: false });
+  return json({ ok: true, provider: "One-time API key", apiKey: key, expiresInSeconds: 600, use: "Enter this key in the portal to create a temporary session.", storage: "The plaintext key is returned once and is not stored; only a hash is held in this Worker isolate until expiry." });
+}
+
+async function handleKeyVerify(request) {
+  pruneLoginState();
+  const body = await readJson(request);
+  const apiKey = body && typeof body.apiKey === "string" ? body.apiKey.slice(0, 200) : "";
+  const hash = apiKey ? await sha256Hex(apiKey) : "";
+  const record = LOGIN_KEYS.get(hash);
+  if (!record || record.used || record.expiresAt < Date.now()) return json({ error: "Invalid or expired one-time API key." }, 401);
+  record.used = true;
+  const sessionToken = newSecret();
+  LOGIN_SESSIONS.set(await sha256Hex(sessionToken), { expiresAt: Date.now() + LOGIN_TTL_MS, provider: "One-time API key", consented: false });
+  return json({ ok: true, sessionToken, expiresInSeconds: LOGIN_TTL_MS / 1000, next: "Present explicit data-source and ad-observation consent before submitting observations." });
+}
+
+async function handleProviderLogin(request) {
+  const body = await readJson(request);
+  const provider = body && typeof body.provider === "string" ? body.provider : "";
+  if (!LOGIN_PROVIDERS.includes(provider)) return json({ error: "Unsupported login provider." }, 400);
+  if (provider === "One-time API key") return json({ ok: true, next: "Use POST /api/login/key/issue to generate a one-time key." });
+  return json({ ok: false, state: "OAUTH_NOT_CONFIGURED", provider, message: `${provider} login requires a separately registered OAuth application and scoped connector. No credentials were requested or collected by this Worker.`, requiredScopes: ["identity only", "no mailbox contents", "no message bodies", "no contact import"] }, 501);
+}
+
+async function sessionFromRequest(request) {
+  const header = request.headers.get("authorization") || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+  if (!token) return null;
+  const hash = await sha256Hex(token);
+  const session = LOGIN_SESSIONS.get(hash);
+  if (!session || session.expiresAt < Date.now()) { LOGIN_SESSIONS.delete(hash); return null; }
+  return session;
+}
+
+function classifyAdObservation(body) {
+  const text = `${body.adText || ""} ${body.context || ""}`.toLowerCase();
+  const categories = [];
+  const rules = [
+    [/(running|shoes|fitness|workout|gym|protein)/, "health, fitness, or activity interest"],
+    [/(loan|credit|bank|insurance|mortgage|invest)/, "financial-product interest"],
+    [/(travel|flight|hotel|vacation|airline)/, "travel intent"],
+    [/(phone|laptop|computer|software|gadget|device)/, "technology or product interest"],
+    [/(car|auto|vehicle|truck)/, "automotive interest"],
+    [/(baby|parent|diaper|family)/, "family or life-stage signal"],
+    [/(sale|discount|coupon|shop|buy|deal)/, "shopping or commercial intent"],
+  ];
+  for (const [pattern, label] of rules) if (pattern.test(text)) categories.push(label);
+  if (!categories.length) categories.push("unclassified contextual or broad-interest signal");
+  const company = typeof body.advertiser === "string" && body.advertiser.trim() ? body.advertiser.trim().slice(0, 160) : "advertiser not supplied";
+  return { likelyCategories: [...new Set(categories)], advertiser: company, explanation: "These are hypotheses from the observation supplied by the user. They do not prove the advertiser purchased or received a personal dossier, and they do not identify a person-level data source.", possibleSignals: ["page or video context", "recent search or browsing intent", "broad interest segment", "geographic or language context", "advertiser first-party interaction"], unknowns: ["actual platform auction inputs", "whether a data broker was involved", "retention period", "identity linkage"], nextSteps: ["Open the platform's ad-preferences explanation.", "Review the advertiser and platform privacy policies.", "Compare multiple observations over time without adding sensitive identifiers."], rawObservationStored: false };
+}
+
+async function handleAdObservation(request) {
+  const session = await sessionFromRequest(request);
+  if (!session) return json({ error: "Login required before ad-observation analysis." }, 401);
+  const body = await readJson(request);
+  if (!body || body.consent !== true || body.dataScope !== "ad-observations-only") return json({ error: "Explicit consent for ad observations and the restricted data scope are required." }, 400);
+  if (body.retention !== "session-only") return json({ error: "This preview accepts session-only retention; persistent profiling is not enabled." }, 400);
+  if (!LOGIN_PROVIDERS.includes(body.source)) return json({ error: "Choose a declared available data source." }, 400);
+  const adText = typeof body.adText === "string" ? body.adText.trim().slice(0, 4000) : "";
+  if (!adText) return json({ error: "Supply an observed ad label or description; private account content is not accepted." }, 400);
+  const result = classifyAdObservation({ ...body, adText });
+  return json({ ok: true, workflow: ["LOGIN", "EXPLICIT CONSENT", "CONNECT AVAILABLE DATA SOURCE", "COLLECT PERMITTED AD OBSERVATION", "EXPLAIN WHY IT MAY HAVE APPEARED", "SHOW COMPANIES AND DATA CATEGORIES", "REPORT"], source: body.source, analyzedAt: new Date().toISOString(), retention: "session-only", result, privacyBoundary: "No mailbox, message body, contacts, password, private account history, precise location, Wi-Fi, cellular, or device fingerprint was requested or stored." });
+}
