@@ -27,11 +27,11 @@ def fail(message):
     raise SystemExit(f"collector refused to run: {message}")
 
 
-def load_config(path):
+def load_config(path, collector="osquery"):
     config = json.loads(Path(path).read_text())
     required = {
         "environment": "authorized-lab",
-        "collector": "osquery",
+        "collector": collector,
         "target_type": "local",
         "remote_targets": False,
         "external_scanning": False,

@@ -45,6 +45,16 @@ Both collectors now use `ingestion_protocol.py` directly:
 
 The protocol applies a 64 KiB bounded batch, retries only transient HTTP/network failures with capped exponential backoff, records accepted/rejected/retry/failure stages to a local JSONL audit log, and returns a degraded state instead of silently dropping collection failures. The existing adapter remains available as the ingestion API and is not removed.
 
+## SSH defensive components
+
+Three separate defensive capabilities are available:
+
+1. `ssh_local_telemetry.py` reads local `/proc` process state and `/proc/net/tcp` listening-port state. It is read-only, binds to no network interface, and reports `container-local` visibility.
+2. `ssh_honeypot.py` binds only to `127.0.0.1:2222`, emits a harmless SSH banner, records connection metadata, and closes the socket. It never authenticates users, accepts commands, executes a shell, proxies traffic, tunnels traffic, or creates C2.
+3. The shared `ingestion_protocol.py` can relay authenticated telemetry to the local adapter or to a specifically configured **HTTPS ingestion API**. That outbound path is telemetry-only and has no command, shell, tunnel, or control-plane semantics; the server still assigns provenance and visibility.
+
+The SSH configurations reject remote targets, scanning, production access, and non-telemetry operation. To use an external relay, change only `ingest_url` to an authorized `https://` ingestion endpoint and provide its bearer token through the configured environment variable. Do not substitute a C2 endpoint.
+
 ## Upstream boundary
 
 [osquery](https://github.com/osquery/osquery) is an architectural and endpoint-observation reference. This repository does not copy osquery code or redistribute its packages. Review the upstream license and package-signing requirements before installing it in the authorized lab.

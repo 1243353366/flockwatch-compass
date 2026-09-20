@@ -172,3 +172,22 @@ This section records every file tracked on the `main` branch at the time of publ
 Corpora AI is organized as a defensive evidence and telemetry system rather than a single script. The supported path is local `/proc` or authorized osquery collection, one shared direct ingestion protocol, an ingestion API that owns provenance and validation, event hashing and deduplication, telemetry-trust health, detection and correlation, evidence retrieval and reasoning, and a dashboard that exposes uncertainty and visibility boundaries. The Node adapter remains intentionally present as the self-hosted runtime/API boundary. The Python service remains a limited algorithmic fallback. No file in this manifest authorizes external scanning, arbitrary command execution, malware execution, retaliation, or unsupported actor attribution.
 
 At this release, the local `/proc` path has been exercised successfully in the container-local environment. The osquery collector is syntax-tested and fail-closed, but host-level osquery collection remains unverified until `osqueryi` is installed and run on the authorized self-hosted Linux host.
+
+
+## [2026-09-19] — SSH defensive telemetry trio
+
+### Added
+
+- Added `collector/ssh_local_telemetry.py` for read-only local process and listening-port observations.
+- Added `collector/ssh-local.json` with authorized-lab, local-only, telemetry-only policy.
+- Added `collector/ssh_honeypot.py` as a non-executing localhost deception listener on `127.0.0.1:2222`.
+- Added `collector/ssh-honeypot.json` with the same fail-closed local policy.
+- Extended the server ingestion allowlist for `ssh-local` and `ssh-honeypot` while preserving server-assigned provenance and visibility.
+
+### Safety boundaries
+
+The honeypot does not authenticate, execute commands, invoke a shell, proxy traffic, tunnel traffic, accept remote targets, or create a command-and-control channel. The SSH telemetry collector reads local evidence only. The shared protocol supports an authorized HTTPS telemetry relay but does not provide C2 semantics; an external relay must be a specifically configured ingestion API, never a control endpoint.
+
+### Verification
+
+Python syntax, JSON configuration, Worker syntax, forbidden-primitive scanning, and diff checks passed. Both SSH collectors use the shared authentication, bounded batching, retry/backoff, graceful failure, audit logging, event identity, heartbeat, and server-validation path.

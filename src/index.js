@@ -316,7 +316,7 @@ async function handleAuthorizedCollectorIngest(request, env) {
   if (request.headers.get("Authorization") !== "Bearer " + token) { EDR_HEALTH.authenticationFailures++; return json({ error: "Unauthorized collector.", state: "REJECTED" }, 401); }
   let body; try { body = await request.json(); } catch { return json({ error: "Invalid collector JSON.", state: "REJECTED" }, 400); }
   const lab = body && body.lab;
-  if (!lab || lab.environment !== "authorized-lab" || !["osquery", "local-proc"].includes(lab.collector) || lab.target_type !== "local" || lab.remote_targets !== false || lab.external_scanning !== false || lab.production_access !== false || lab.telemetry_only !== true) return json({ error: "Collector lab policy rejected. Only local telemetry-only osquery or explicitly labeled local-proc collection is accepted.", state: "REJECTED" }, 403);
+  if (!lab || lab.environment !== "authorized-lab" || !["osquery", "local-proc", "ssh-local", "ssh-honeypot"].includes(lab.collector) || lab.target_type !== "local" || lab.remote_targets !== false || lab.external_scanning !== false || lab.production_access !== false || lab.telemetry_only !== true) return json({ error: "Collector lab policy rejected. Only authorized local telemetry collectors are accepted.", state: "REJECTED" }, 403);
   const sourceEvents = Array.isArray(body.events) ? body.events : [];
   if (!sourceEvents.length || sourceEvents.length > 50) return json({ error: "Collector must send 1 to 50 events.", state: "REJECTED" }, 400);
   const events = sourceEvents.map((event) => ({ ...event, synthetic: false, collector: lab.collector }));

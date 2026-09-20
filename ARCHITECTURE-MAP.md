@@ -27,6 +27,8 @@ The self-host adapter remains the runtime that exposes the ingestion API. It is 
 | Layer | Canonical files | Role | Status |
 |---|---|---|---|
 | Local collection | `collector/local_linux_collector.py` | Read-only `/proc` fallback; explicitly `container-local` | Critical, tested |
+| SSH telemetry | `collector/ssh_local_telemetry.py`, `collector/ssh-local.json` | Read-only local process/listening-port evidence; direct authenticated relay | Critical, syntax-tested |
+| SSH deception | `collector/ssh_honeypot.py`, `collector/ssh-honeypot.json` | `127.0.0.1:2222` banner-only listener; records attempts without execution | Bounded, syntax-tested |
 | Host collection | `collector/osquery_collector.py` | Fixed read-only osquery queries; intended for authorized host-level collection | Critical, syntax-tested; live osquery unverified because `osqueryi` is absent |
 | Collector protocol | `collector/ingestion_protocol.py` | One source of truth for auth, 64 KiB batch bound, retry/backoff, failure state, and JSONL audit | Critical, tested |
 | Collector policy | `collector/osquery-lab.json` | Local-only target, endpoint identity, ingestion URL, token environment | Critical, parsed |
