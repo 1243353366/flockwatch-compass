@@ -36,6 +36,13 @@ CREATE TABLE IF NOT EXISTS ai_runs (
 );
 CREATE INDEX IF NOT EXISTS idx_ai_runs_created_at ON ai_runs(created_at DESC);
 
+-- Customer-scoped control token. Only a SHA-256 token hash is stored.
+CREATE TABLE IF NOT EXISTS ai_run_access (
+  run_id INTEGER PRIMARY KEY,
+  token_hash TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- Claims remain separate from observations so unsupported inferences can be scored.
 CREATE TABLE IF NOT EXISTS ai_claims (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

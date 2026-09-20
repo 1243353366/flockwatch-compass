@@ -154,6 +154,7 @@ async function persistAnalysis(env, result, inputChars) {
   if (!db) return null;
   if (!(await encryptionKey(env))) return null;
   const requestId = crypto.randomUUID();
+  const accessToken = crypto.randomUUID() + "-" + crypto.randomUUID();
   const output = JSON.stringify({ summary: result.ai && result.ai.summary, topics: result.ai && result.ai.topics || [], entities: result.ai && result.ai.entities || [], algorithmic: result.stats, skeptic: result.skeptic });
   try {
     const encryptedOutput = await encryptForStorage(env, output);
@@ -163,11 +164,14 @@ async function persistAnalysis(env, result, inputChars) {
     const inserted = await db.prepare("INSERT INTO ai_runs (request_id, mode, model, input_chars, output_json, confidence) VALUES (?, ?, ?, ?, ?, ?)")
       .bind(requestId, result.mode, result.ai ? AI_MODEL : "algorithmic", inputChars, encryptedOutput, result.ai ? 0.5 : null).run();
     const runId = inserted.meta && inserted.meta.last_row_id;
+    if (!runId) return null;
+    const followUp = [db.prepare("INSERT INTO ai_run_access (run_id, token_hash) VALUES (?, ?)").bind(runId, await sha256Hex(accessToken))];
     if (runId && result.ai && result.ai.summary && encryptedClaim) {
-      await db.prepare("INSERT INTO ai_claims (run_id, claim, claim_type, evidence_json, confidence, verification_status) VALUES (?, ?, ?, ?, ?, ?)")
-        .bind(runId, "Encrypted analysis claim; decrypt through an authorized dashboard path.", "encrypted-summary", encryptedClaim, 0.5, "unverified").run();
+      followUp.push(db.prepare("INSERT INTO ai_claims (run_id, claim, claim_type, evidence_json, confidence, verification_status) VALUES (?, ?, ?, ?, ?, ?)")
+        .bind(runId, "Encrypted analysis claim; decrypt through an authorized dashboard path.", "encrypted-summary", encryptedClaim, 0.5, "unverified"));
     }
-    return runId || requestId;
+    await db.batch(followUp);
+    return { runId, accessToken };
   } catch { return null; }
 }
 
@@ -413,6 +417,11 @@ async function encryptForStorage(env, value) {
   return `aes-256-gcm:v1:${base64Bytes(iv)}:${base64Bytes(new Uint8Array(ciphertext))}`;
 }
 
+async function sha256Hex(value) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 function normalizeEntity(value) {
   return String(value || "").trim().toLowerCase().replace(/\[\.\]/g, ".").replace(/\s+/g, " ");
 }
@@ -581,6 +590,7 @@ const PAGE = `<!DOCTYPE html>
     <label class="lbl" for="input">Your text corpus (up to 32KB)</label>
     <textarea id="input" rows="8" placeholder="Paste an article, a report, a thread, research notes&hellip;"></textarea>
     <label class="consent"><input id="persist" type="checkbox"> Save an evaluation case for human review (stores output metadata, not raw text)</label>
+    <section class="data-notice"><strong>Purpose limitation:</strong> persistence is opt-in. If saved, the encrypted result is returned with a one-time customer access token; keep it private to export or delete this run later.</section>
     <div class="row">
       <button id="analyze" class="cta" type="button">Analyze corpus</button>
       <button id="proof" class="cta secondary" type="button">Run bounded proof</button>
@@ -590,6 +600,7 @@ const PAGE = `<!DOCTYPE html>
   </section>
   <section class="input-card catalog-card"><div class="lbl">Agent architecture catalog</div><p class="muted">Reference-only sources shaping retrieval, structured claims, evaluation, and observability. No upstream code is executed here.</p><div id="source-catalog" class="catalog">Loading source catalog&hellip;</div></section>
   <section class="grid">
+    <article class="card"><h2>Customer privacy controls</h2><p class="muted">Use the run ID and private access token returned when you opted into persistence. Export returns encrypted output; deletion removes the run, claims, feedback, and access credential.</p><label class="lbl" for="privacy-run-id">Run ID</label><input id="privacy-run-id" class="text-input" inputmode="numeric" autocomplete="off" placeholder="e.g. 12"><label class="lbl modal-label" for="privacy-token">Access token</label><input id="privacy-token" class="text-input" type="password" autocomplete="off" placeholder="Paste the private token"><div class="row"><button id="privacy-export" class="cta secondary" type="button">Export encrypted run</button><button id="privacy-delete" class="cta secondary" type="button">Delete run</button></div><pre id="privacy-run-output" class="proof-output" hidden></pre></article>
     <article class="card"><h2>Evidence retrieval</h2><p class="muted">Retrieve content-bearing, provenance-labeled material from the local knowledge index. Results are context, not proof of compromise.</p><div class="row"><input id="retrieve-query" class="text-input" value="incident response" aria-label="Retrieval query"><button id="retrieve" class="cta" type="button">Retrieve content</button></div><pre id="retrieval-output" class="proof-output" hidden></pre></article>
     <article class="card"><h2>Synthetic EDR pipeline</h2><p class="muted">Run one harmless fixture through ingest, normalization, correlation, detection, display, and audit logging. No host agent or real target is contacted.</p><button id="edr-demo" class="cta secondary" type="button">Run synthetic EDR check</button><pre id="edr-output" class="proof-output" hidden></pre></article>
     <article class="card"><h2>EDR health and visibility</h2><p class="muted">Health is based on recent telemetry, not application uptime. Visibility is server-labeled and never upgrades container-local data to host-level EDR.</p><div id="edr-health" class="health-panel">Checking telemetry health&hellip;</div></article>
@@ -701,10 +712,30 @@ $("analyze").addEventListener("click", async () => {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Analysis failed (" + res.status + ")");
     render(data);
-    msg.textContent = data.runId ? "Analyzed and saved as evaluation run " + data.runId + "." : (data.mode === "ai+algorithmic" ? "Analyzed with Workers AI + algorithmic pass." : "Analyzed in algorithmic mode (AI unavailable right now).");
+    if (data.runId && typeof data.runId === "object") {
+      $("privacy-run-id").value = data.runId.runId;
+      $("privacy-token").value = data.runId.accessToken;
+      msg.textContent = "Saved as evaluation run " + data.runId.runId + ". Keep the displayed access token private; it will not be shown again by the server.";
+    } else msg.textContent = data.mode === "ai+algorithmic" ? "Analyzed with Workers AI + algorithmic pass." : "Analyzed in algorithmic mode (AI unavailable right now).";
   } catch (e) { msg.textContent = e.message; }
   $("analyze").disabled = false;
 });
+
+async function privacyRequest(method, path) {
+  const output = $("privacy-run-output");
+  const runId = Number($("privacy-run-id").value.trim());
+  const accessToken = $("privacy-token").value.trim();
+  if (!Number.isInteger(runId) || !accessToken) { output.hidden = false; output.textContent = "Enter the run ID and private access token."; return; }
+  try {
+    const res = await fetch(path, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ runId, accessToken }) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Privacy request failed (" + res.status + ")");
+    output.hidden = false; output.textContent = JSON.stringify(data, null, 2);
+    if (method === "DELETE") { $("privacy-token").value = ""; output.textContent += "\n\nThe access token was cleared from this page."; }
+  } catch (e) { output.hidden = false; output.textContent = e.message; }
+}
+$("privacy-export").addEventListener("click", () => privacyRequest("POST", "/api/privacy/export"));
+$("privacy-delete").addEventListener("click", () => privacyRequest("DELETE", "/api/privacy/run"));
 
 $("proof").addEventListener("click", async () => {
   const text = $("input").value.trim();
@@ -848,6 +879,8 @@ export default {
       if (url.pathname === "/api/governance/diagnostics") return handleDiagnostics(request, env);
     }
     if (request.method === "POST" && url.pathname === "/api/analyze") return handleAnalyze(request, env);
+    if (request.method === "POST" && url.pathname === "/api/privacy/export") return handlePrivacyExport(request, env);
+    if (request.method === "DELETE" && url.pathname === "/api/privacy/run") return handlePrivacyDelete(request, env);
     if (request.method === "POST" && url.pathname === "/api/corpora/ingest") return handleIngest(request, env);
     if (request.method === "GET" && url.pathname === "/api/corpora/search") return handleCorporaSearch(request, env);
     if (request.method === "GET" && url.pathname === "/api/corpora/sources") return handleSourceCatalog(request, env);
@@ -943,3 +976,40 @@ async function handleC2Contain(request) {
   run.recovery = "verified-in-range";
   return json({ ok: true, mode: "contained-cyber-range", simulationId: runId, containment: run.containment, recovery: run.recovery, evidenceRetained: run.evidenceRetained });
 }
+
+async function scopedRun(request, env) {
+  let body;
+  try { body = await request.json(); } catch { return { error: json({ error: "Invalid JSON body." }, 400) }; }
+  const runId = Number.isInteger(body.runId) ? body.runId : Number(body.runId);
+  const accessToken = typeof body.accessToken === "string" ? body.accessToken.slice(0, 200) : "";
+  if (!Number.isInteger(runId) || runId < 1 || !accessToken) return { error: json({ error: "runId and accessToken are required." }, 400) };
+  const db = aiDb(env);
+  if (!db) return { error: json({ error: "Encrypted memory database is not configured." }, 503) };
+  try {
+    const { results } = await db.prepare("SELECT r.id, r.request_id, r.mode, r.model, r.input_chars, r.output_json, r.confidence, r.created_at FROM ai_runs r JOIN ai_run_access a ON a.run_id = r.id WHERE r.id = ? AND a.token_hash = ? LIMIT 1").bind(runId, await sha256Hex(accessToken)).all();
+    if (!results || !results[0]) return { error: json({ error: "Run not found or access token invalid." }, 404) };
+    return { db, row: results[0], runId };
+  } catch { return { error: json({ error: "Privacy control unavailable; verify the ai_run_access migration is applied." }, 503) }; }
+}
+
+async function handlePrivacyExport(request, env) {
+  const scoped = await scopedRun(request, env);
+  if (scoped.error) return scoped.error;
+  return json({ ok: true, export: { format: "encrypted-json", run: { id: scoped.row.id, requestId: scoped.row.request_id, mode: scoped.row.mode, model: scoped.row.model, inputChars: scoped.row.input_chars, confidence: scoped.row.confidence, createdAt: scoped.row.created_at, encryptedOutput: scoped.row.output_json } }, limitation: "The exported payload remains AES-256-GCM encrypted. The customer or authorized operator must retain the deployment key to decrypt it." });
+}
+
+async function handlePrivacyDelete(request, env) {
+  const scoped = await scopedRun(request, env);
+  if (scoped.error) return scoped.error;
+  try {
+    await scoped.db.batch([
+      scoped.db.prepare("DELETE FROM ai_claims WHERE run_id = ?").bind(scoped.runId),
+      scoped.db.prepare("DELETE FROM ai_feedback WHERE run_id = ?").bind(scoped.runId),
+      scoped.db.prepare("DELETE FROM ai_run_access WHERE run_id = ?").bind(scoped.runId),
+      scoped.db.prepare("DELETE FROM ai_runs WHERE id = ?").bind(scoped.runId),
+    ]);
+    return json({ ok: true, deleted: true, runId: scoped.runId });
+  } catch { return json({ error: "Deletion failed; no completion claim was made." }, 500); }
+}
+
+/* ---------- privacy controls ---------- */
