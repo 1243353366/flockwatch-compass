@@ -33,6 +33,18 @@ The osquery collector source compiles and rejects remote or otherwise unsafe con
 
 For containerized or minimal Linux environments where osquery is unavailable, `local_linux_collector.py` provides a deliberately narrower, read-only fallback from local `/proc` process state. It is labeled `local-proc`, authenticated through the same ingestion path, and reports `visibility=container-local`; it must not be interpreted as host-level EDR visibility.
 
+## Direct production protocol
+
+Both collectors now use `ingestion_protocol.py` directly:
+
+```text
+/proc or osquery → collector protocol client → Bearer-authenticated ingestion API
+→ server-assigned provenance → schema validation → server hash/event identity
+→ deduplication → heartbeat/health → detection → audit response
+```
+
+The protocol applies a 64 KiB bounded batch, retries only transient HTTP/network failures with capped exponential backoff, records accepted/rejected/retry/failure stages to a local JSONL audit log, and returns a degraded state instead of silently dropping collection failures. The existing adapter remains available as the ingestion API and is not removed.
+
 ## Upstream boundary
 
 [osquery](https://github.com/osquery/osquery) is an architectural and endpoint-observation reference. This repository does not copy osquery code or redistribute its packages. Review the upstream license and package-signing requirements before installing it in the authorized lab.

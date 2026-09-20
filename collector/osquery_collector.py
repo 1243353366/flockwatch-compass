@@ -11,11 +11,10 @@ import os
 import subprocess
 import sys
 import time
-import urllib.error
-import urllib.request
 from urllib.parse import urlparse
 from datetime import datetime, timezone
 from pathlib import Path
+from ingestion_protocol import append_audit, graceful_error, send_batch
 
 FIXED_QUERIES = {
     "processes": ("edr.process.v1", "process_observation", "SELECT pid, parent, name, path, cmdline, uid FROM processes;"),
@@ -80,7 +79,12 @@ def event_id(table, row, observed_at):
 def collect(config):
     binary = config.get("osquery_binary", "osqueryi")
     observed_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-    events = []
+    heartbeat = {"table": "collector_heartbeat", "collector": "osquery", "observedAt": observed_at}
+    events = [{
+        "synthetic": False, "eventVersion": "edr.identity.v1", "eventId": event_id("heartbeat", heartbeat, observed_at),
+        "eventType": "identity_heartbeat", "observedAt": observed_at, "hostId": config["endpoint_id"], "username": "",
+        "collector": "osquery", "provenance": {"classification": "LIVE_LOCAL_OBSERVATION", "source": "osquery", "table": "collector_heartbeat", "authorization": "authorized-lab-local", "collectionTimestamp": observed_at, "visibility": "host-level"}
+    }]
     for table, (version, event_type, query) in FIXED_QUERIES.items():
         for row in run_osquery(binary, query):
             row = {str(k): row[k] for k in row}
@@ -106,24 +110,6 @@ def collect(config):
     return {"lab": config, "events": events[:50]}
 
 
-def ingest(config, payload):
-    token = os.environ.get(config["token_env"], "")
-    if not token:
-        fail(f"environment variable {config['token_env']} is missing")
-    body = json.dumps(payload).encode()
-    request = urllib.request.Request(config["ingest_url"], data=body, method="POST", headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"})
-    try:
-        with urllib.request.urlopen(request, timeout=20) as response:
-            result = json.loads(response.read().decode())
-            if response.status >= 300:
-                fail(f"ingestion rejected with HTTP {response.status}")
-            return result
-    except urllib.error.HTTPError as exc:
-        fail(f"ingestion rejected with HTTP {exc.code}")
-    except urllib.error.URLError as exc:
-        fail(f"ingestion unavailable: {exc.reason}")
-
-
 def main():
     parser = argparse.ArgumentParser(description="Collect fixed read-only osquery telemetry from an authorized local Linux lab")
     parser.add_argument("--config", default=str(Path(__file__).with_name("osquery-lab.json")))
@@ -132,12 +118,14 @@ def main():
     config = load_config(args.config)
     interval = max(10, int(config.get("interval_seconds", 30)))
     while True:
-        payload = collect(config)
-        if not payload["events"]:
-            print(json.dumps({"state": "DEGRADED", "reason": "osquery returned no rows", "events": 0}), flush=True)
-        else:
-            result = ingest(config, payload)
+        try:
+            payload = collect(config)
+            result = send_batch(config, payload)
             print(json.dumps({"state": "COLLECTED_AND_INGESTED", "events": len(payload["events"]), "result": result}), flush=True)
+        except (RuntimeError, SystemExit) as exc:
+            print(json.dumps(graceful_error(config, exc)), flush=True)
+            if args.once:
+                return
         if args.once:
             return
         time.sleep(interval)

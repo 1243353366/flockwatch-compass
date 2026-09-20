@@ -12,7 +12,8 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
-from osquery_collector import event_id, ingest, load_config
+from ingestion_protocol import graceful_error, send_batch
+from osquery_collector import event_id, load_config
 
 
 def now():
@@ -66,8 +67,14 @@ def main():
         if not payload["events"]:
             print(json.dumps({"state": "DEGRADED", "reason": "no readable local process telemetry", "events": 0}), flush=True)
         else:
-            result = ingest(config, payload)
-            print(json.dumps({"state": "COLLECTED_AND_INGESTED", "collector": "local-proc", "visibility": "container-local", "events": len(payload["events"]), "result": result}), flush=True)
+            try:
+                result = send_batch(config, payload)
+                print(json.dumps({"state": "COLLECTED_AND_INGESTED", "collector": "local-proc", "visibility": "container-local", "events": len(payload["events"]), "result": result}), flush=True)
+            except RuntimeError as exc:
+                print(json.dumps(graceful_error(config, exc)), flush=True)
+                if args.once:
+                    return
+                time.sleep(min(interval, 8))
         if args.once:
             return
         time.sleep(max(10, int(config.get("interval_seconds", 30))))
