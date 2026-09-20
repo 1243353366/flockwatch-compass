@@ -248,8 +248,10 @@ function detectEdrEvent(event) {
   const command = event.commandLine.toLowerCase();
   const process = event.processName.toLowerCase();
   const suspicious = ["powershell", "rundll32", "regsvr32", "mshta", "wscript", "cscript"].some((name) => process.includes(name) || command.includes(name));
-  const ruleId = suspicious ? "EDR-SYNTH-001-suspicious-script-interpreter" : "EDR-SYNTH-000-no-match";
-  return { ruleId, ruleVersion: "1", severity: suspicious ? "medium" : "informational", confidence: suspicious ? 0.78 : 0.1, status: suspicious ? "detected" : "no-threat-observed", rationale: suspicious ? "A synthetic script-interpreter event matched a bounded defensive rule; validate parent process, command line, and user context before action." : "No bounded synthetic rule matched this event; this is not proof that no threat exists.", falsePositiveNotes: "Administrative automation and software deployment can resemble this pattern.", requiredTelemetry: ["process_name", "parent_process", "command_line", "observed_at", "host_id"] };
+  const simulatedBeacon = event.collector === "simulated-c2" && event.eventType.includes("beacon") && event.destinationPort === 443;
+  const ruleId = simulatedBeacon ? "EDR-SIM-001-beacon-pattern" : suspicious ? "EDR-SYNTH-001-suspicious-script-interpreter" : "EDR-SYNTH-000-no-match";
+  const detected = simulatedBeacon || suspicious;
+  return { ruleId, ruleVersion: "1", severity: detected ? "medium" : "informational", confidence: simulatedBeacon ? 0.82 : suspicious ? 0.78 : 0.1, status: detected ? "detected" : "no-threat-observed", rationale: simulatedBeacon ? "Synthetic beacon-like timing and destination metadata matched a bounded C2-simulation rule; this is not evidence of a real compromise." : suspicious ? "A synthetic script-interpreter event matched a bounded defensive rule; validate parent process, command line, and user context before action." : "No bounded synthetic rule matched this event; this is not proof that no threat exists.", falsePositiveNotes: "Periodic application traffic, monitoring, updates, and administrative automation can resemble this pattern.", requiredTelemetry: ["process_name", "parent_process", "command_line", "observed_at", "host_id"] };
 }
 
 async function rejectEdr(env, raw, reason) {
@@ -287,7 +289,8 @@ async function handleEdrEvents(request, env, options = {}) {
     seen.add(eventId);
     LOCAL_EDR_SEEN.add(eventId);
     if (LOCAL_EDR_SEEN.size > 10000) LOCAL_EDR_SEEN.delete(LOCAL_EDR_SEEN.values().next().value);
-    const event = { eventId, observationId: await sha256(JSON.stringify(raw)), eventVersion: raw.eventVersion, eventType: String(raw.eventType).slice(0, 60), hostId: String(raw.hostId).slice(0, 120), observedAt: timestamp.toISOString(), processName: String(raw.processName || "").slice(0, 160), parentProcess: String(raw.parentProcess || "").slice(0, 160), commandLine: String(raw.commandLine || "").slice(0, 500), filePath: String(raw.filePath || "").slice(0, 300), destinationIp: String(raw.destinationIp || "").slice(0, 80), destinationPort: Number.isInteger(raw.destinationPort) ? raw.destinationPort : null, username: String(raw.username || "").slice(0, 120), synthetic: options.allowAuthorizedLocal ? false : true, provenance: options.allowAuthorizedLocal ? { classification: "LIVE_LOCAL_OBSERVATION", source: options.collector || "authorized-local-collector", authorization: "server-verified-authorized-lab", visibility: options.visibility || "container-local" } : { classification: "SYNTHETIC_FIXTURE", source: "synthetic-edr-fixture", authorization: "synthetic-only", visibility: "synthetic" } };
+    const simulated = !options.allowAuthorizedLocal && raw.collector === "simulated-c2";
+    const event = { eventId, observationId: await sha256(JSON.stringify(raw)), eventVersion: raw.eventVersion, eventType: String(raw.eventType).slice(0, 60), collector: String(raw.collector || "synthetic-edr-fixture").slice(0, 60), hostId: String(raw.hostId).slice(0, 120), observedAt: timestamp.toISOString(), processName: String(raw.processName || "").slice(0, 160), parentProcess: String(raw.parentProcess || "").slice(0, 160), commandLine: String(raw.commandLine || "").slice(0, 500), filePath: String(raw.filePath || "").slice(0, 300), destinationIp: String(raw.destinationIp || "").slice(0, 80), destinationPort: Number.isInteger(raw.destinationPort) ? raw.destinationPort : null, username: String(raw.username || "").slice(0, 120), synthetic: options.allowAuthorizedLocal ? false : true, provenance: options.allowAuthorizedLocal ? { classification: "LIVE_LOCAL_OBSERVATION", source: options.collector || "authorized-local-collector", authorization: "server-verified-authorized-lab", visibility: options.visibility || "container-local" } : { classification: simulated ? "SIMULATED_C2" : "SYNTHETIC_FIXTURE", source: simulated ? "contained-cyber-range" : "synthetic-edr-fixture", authorization: "synthetic-only", visibility: "synthetic" } };
     if (options.allowAuthorizedLocal && event.eventType === "identity_heartbeat") EDR_HEALTH.lastHeartbeatAt = new Date().toISOString();
     const detection = detectEdrEvent(event);
     const correlationId = `host:${event.hostId}:event:${event.eventType}`;
@@ -754,6 +757,89 @@ export default {
     if (request.method === "GET" && url.pathname === "/api/edr/health") return handleEdrHealth();
     if (request.method === "POST" && url.pathname === "/api/ai/feedback") return handleFeedback(request, env);
     if (request.method === "POST" && url.pathname === "/api/observatory/proof") return handleObservatoryProof(request, env);
+    if (request.method === "GET" && url.pathname === "/api/range/c2/catalog") return handleC2Catalog();
+    if (request.method === "POST" && url.pathname === "/api/range/c2/run") return handleC2Run(request, env);
+    if (request.method === "POST" && url.pathname === "/api/range/c2/contain") return handleC2Contain(request);
     return new Response("Not found", { status: 404, headers: secHeaders({ "content-type": "text/plain; charset=utf-8" }) });
   },
 };
+
+
+const C2_TASKS = Object.freeze({
+  DISCOVERY_SIMULATION: { eventVersion: "edr.network.v1", eventType: "network_discovery_simulation", behavior: "synthetic discovery metadata only" },
+  PROCESS_ENUMERATION_SIMULATION: { eventVersion: "edr.process.v1", eventType: "process_enumeration_simulation", behavior: "synthetic process inventory metadata only" },
+  NETWORK_ENUMERATION_SIMULATION: { eventVersion: "edr.network.v1", eventType: "network_enumeration_simulation", behavior: "synthetic network inventory metadata only" },
+  FILE_ACCESS_SIMULATION: { eventVersion: "edr.file.v1", eventType: "file_access_simulation", behavior: "synthetic file-access metadata only" },
+  BEACON_TEST: { eventVersion: "edr.network.v1", eventType: "network_beacon_simulation", behavior: "synthetic periodic beacon metadata only" },
+  SLEEP_JITTER_TEST: { eventVersion: "edr.identity.v1", eventType: "identity_jitter_simulation", behavior: "synthetic timing jitter metadata only" },
+  EXFILTRATION_SIMULATION: { eventVersion: "edr.network.v1", eventType: "network_exfiltration_simulation", behavior: "synthetic transfer metadata only; no data leaves the range" },
+});
+const C2_RUNS = new Map();
+
+function c2SafetyFailure(body) {
+  const required = { range: "authorized-cyber-range", authorized: true, syntheticTarget: true, isolated: true, safeSimulationMode: true };
+  return Object.entries(required).find(([key, value]) => body[key] !== value);
+}
+
+function c2Event(runId, agentId, taskName, task, index, scenario) {
+  const observedAt = new Date(Date.now() + index * (scenario.jitterMs || 0)).toISOString();
+  const detectedPath = scenario.mode === "detected";
+  return {
+    synthetic: true,
+    eventVersion: task.eventVersion,
+    eventId: `sim-${runId}-${agentId}-${index}`,
+    eventType: task.eventType,
+    collector: "simulated-c2",
+    observedAt,
+    hostId: agentId,
+    processName: task.eventVersion === "edr.process.v1" ? "simulated-agent" : "",
+    parentProcess: task.eventVersion === "edr.process.v1" ? "simulated-range-controller" : "",
+    commandLine: "",
+    destinationIp: "127.0.0.1",
+    destinationPort: task.eventVersion === "edr.network.v1" ? (detectedPath ? 443 : 8443) : null,
+    username: "synthetic-agent",
+    simulationId: runId,
+    taskId: `task-${runId}-${index}`,
+    behavior: task.behavior,
+    jitterMs: scenario.jitterMs || 0,
+  };
+}
+
+async function handleC2Catalog() {
+  return json({ ok: true, mode: "contained-cyber-range", safety: { bind: "localhost-or-isolated-range-only", arbitraryCommands: false, externalAgents: false, scanning: false, persistence: false, privilegeEscalation: false, tunneling: false, lateralMovement: false, malware: false, fileTransfer: false }, tasks: Object.entries(C2_TASKS).map(([name, task]) => ({ name, ...task })), scenarios: [{ name: "detected-beacon", mode: "detected", expectedDetection: true }, { name: "not-detected-benign-periodic", mode: "not-detected", expectedDetection: false }] });
+}
+
+async function handleC2Run(request, env) {
+  const body = await request.json().catch(() => null) || {};
+  const failed = c2SafetyFailure(body);
+  if (failed) return json({ error: `Simulation blocked: safety preflight failed at ${failed[0]}.`, state: "BLOCKED" }, 403);
+  const scenario = ["detected", "not-detected"].includes(body.mode) ? { mode: body.mode, jitterMs: Math.min(5000, Math.max(0, Number(body.jitterMs) || 0)) } : null;
+  const taskName = typeof body.task === "string" ? body.task : "BEACON_TEST";
+  if (!scenario || !C2_TASKS[taskName]) return json({ error: "Use a predefined task and mode: detected or not-detected.", state: "REJECTED" }, 400);
+  const agentCount = Math.min(5, Math.max(1, Number(body.agentCount) || 1));
+  const runId = `c2sim-${crypto.randomUUID()}`;
+  const task = C2_TASKS[taskName];
+  const events = [];
+  for (let agent = 1; agent <= agentCount; agent++) events.push(c2Event(runId, `synthetic-agent-${agent}`, taskName, task, agent - 1, scenario));
+  const startedAt = Date.now();
+  const response = await handleEdrEvents(new Request(request.url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ events }) }), env);
+  const result = await response.json();
+  const detections = Array.isArray(result.events) ? result.events.map((item) => item.detection) : [];
+  const actualDetection = detections.some((item) => item.status === "detected");
+  const run = { simulationId: runId, syntheticAgentIds: events.map((event) => event.hostId), task: taskName, mode: scenario.mode, expectedDetection: scenario.mode === "detected", actualDetection, detectionLatencyMs: Date.now() - startedAt, telemetryReceived: events.length, telemetryMissing: result.count !== events.length, falsePositiveOrNegative: actualDetection !== (scenario.mode === "detected") ? "mismatch" : "match", containment: { status: "not-requested" }, recovery: "pending", evidenceRetained: true, provenance: "SIMULATED_C2", result };
+  C2_RUNS.set(runId, run);
+  if (C2_RUNS.size > 100) C2_RUNS.delete(C2_RUNS.keys().next().value);
+  return json({ ok: true, mode: "contained-cyber-range", run });
+}
+
+async function handleC2Contain(request) {
+  const body = await request.json().catch(() => null) || {};
+  const failed = c2SafetyFailure(body);
+  if (failed) return json({ error: `Containment blocked: safety preflight failed at ${failed[0]}.`, state: "BLOCKED" }, 403);
+  const runId = typeof body.simulationId === "string" ? body.simulationId : "";
+  const run = C2_RUNS.get(runId);
+  if (!run) return json({ error: "Simulation not found in this Worker isolate.", state: "NOT_FOUND" }, 404);
+  run.containment = { status: "contained", action: "SIMULATED_AGENT_ISOLATED", executedAgainst: run.syntheticAgentIds, externalEffect: false };
+  run.recovery = "verified-in-range";
+  return json({ ok: true, mode: "contained-cyber-range", simulationId: runId, containment: run.containment, recovery: run.recovery, evidenceRetained: run.evidenceRetained });
+}

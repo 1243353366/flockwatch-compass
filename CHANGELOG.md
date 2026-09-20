@@ -191,3 +191,21 @@ The honeypot does not authenticate, execute commands, invoke a shell, proxy traf
 ### Verification
 
 Python syntax, JSON configuration, Worker syntax, forbidden-primitive scanning, and diff checks passed. Both SSH collectors use the shared authentication, bounded batching, retry/backoff, graceful failure, audit logging, event identity, heartbeat, and server-validation path.
+
+
+## [2026-09-19] — Contained C2 simulation and platform threat model
+
+### Added
+
+- Added a fail-closed synthetic cyber-range C2 simulator in `src/index.js`.
+- Added catalog, run, and containment routes under `/api/range/c2/*`.
+- Added predefined harmless simulation tasks, synthetic agent IDs, jitter metadata, task/result correlation, detection latency, expected-versus-actual detection, evidence retention, recovery status, and synthetic containment records.
+- Added `THREAT-MODEL.md` covering telemetry poisoning, untrusted evidence and prompt injection, collector compromise, API abuse, resource exhaustion, SSRF boundaries, cyber-range escape, and recovery trust.
+
+### Verification
+
+- Detected-beacon and intentionally not-detected scenarios both passed.
+- Synthetic events were classified as `SIMULATED_C2`, distinct from live local telemetry.
+- Synthetic containment isolated only synthetic agent IDs and reported no external effect.
+- Invalid range, authorization, target, isolation, or safe-mode preflight was rejected with HTTP 403.
+- No arbitrary commands, shell execution, external-agent enrollment, scanning, persistence, privilege escalation, lateral movement, tunneling, file transfer, malware deployment, or Internet-facing C2 listener was added.

@@ -67,6 +67,12 @@ Additional endpoints are `GET /api/corpora/sources` for the reference catalog an
 
 For the authorized local Linux lab, [collector/osquery_collector.py](collector/osquery_collector.py) runs fixed read-only osquery queries and sends authenticated local telemetry to `POST /api/edr/ingest`. Its [lab configuration](collector/osquery-lab.json) rejects remote targets, external scanning, production access, and non-telemetry modes. Live osquery collection is not claimed until `osqueryi` is installed on the authorized lab host.
 
+## Contained C2 simulation
+
+The Worker includes a fail-closed synthetic cyber-range simulator at `GET /api/range/c2/catalog`, `POST /api/range/c2/run`, and `POST /api/range/c2/contain`. It models registration, beacon-like events, jitter, predefined harmless task primitives, result correlation, detection, synthetic containment, evidence retention, and recovery status. It supports both detected and intentionally not-detected scenarios so the system does not manufacture success.
+
+Every simulation requires the explicit preflight values `range=authorized-cyber-range`, `authorized=true`, `syntheticTarget=true`, `isolated=true`, and `safeSimulationMode=true`. Tasks are fixed simulation labels; arbitrary commands, shell execution, external agents, scanning, persistence, privilege escalation, lateral movement, tunneling, file transfer, malware, and Internet-facing listeners are not implemented. Simulated events are classified as `SIMULATED_C2` and remain distinct from `LIVE_LOCAL_OBSERVATION`, `SYNTHETIC`, and `UNKNOWN`.
+
 The external knowledge seed is deliberately curated around [MITRE ATT&CK](https://attack.mitre.org/), [NIST SP 800-61](https://csrc.nist.gov/pubs/sp/800/61/r2/final), [NIST SP 800-115](https://csrc.nist.gov/pubs/sp/800/115/final), the [CISA KEV Catalog](https://www.cisa.gov/known-exploited-vulnerabilities-catalog), and the existing malware/CTI reference sources. These are provenance-bearing references, not an undifferentiated blog dump and not executable instructions.
 
 ## Wrangler release hardening
@@ -110,3 +116,5 @@ The attached evidence-governance specification is captured in the [AI Threat Obs
 See [UPSTREAM-CREDITS.md](UPSTREAM-CREDITS.md) for the professional upstream attribution index, creator links, license-preservation requirements, and the distinction between reference material and incorporated code.
 
 See [AUDIT-REPORT.md](AUDIT-REPORT.md) for the adversarial syntax, runtime, deployment, EDR, evidence, encryption, failure-mode, and security-boundary assessment. The report deliberately distinguishes demonstrated capabilities from partial and untested components.
+
+See [THREAT-MODEL.md](THREAT-MODEL.md) for the security-platform threat model covering telemetry poisoning, untrusted evidence and prompt injection, collector compromise, range escape, resource exhaustion, audit evasion, and recovery trust.
