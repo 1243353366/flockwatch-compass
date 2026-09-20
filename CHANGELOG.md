@@ -112,3 +112,63 @@ The Observatory remains analysis-only for external evidence. It does not execute
 - Added MIT licensing, notices, upstream credits, and deployment documentation.
 
 [Unreleased]: https://github.com/1243353366/corpora-ai/compare/main...HEAD
+
+
+## Complete repository manifest — 2026-09-19
+
+This section records every file tracked on the `main` branch at the time of publication. The manifest is intentionally complete so the changelog also serves as a compact repository inventory.
+
+### Deployment and automation
+
+| File | Purpose |
+|---|---|
+| `.github/workflows/deploy.yml` | Manual Node 24 CI and locked Wrangler deployment workflow |
+| `.gitignore` | Excludes dependencies, Wrangler output, Python caches, and local collector audit logs |
+| `.nvmrc` | Node 24 runtime pin |
+| `package.json` | Runtime engine, scripts, and Wrangler dependency declaration |
+| `package-lock.json` | Locked npm dependency graph, including Wrangler 4 |
+| `wrangler.toml` | Canonical Cloudflare Worker configuration |
+
+### Application runtime and interface
+
+| File | Purpose |
+|---|---|
+| `src/index.js` | Cloudflare Worker, API routes, ingestion, normalization, detection, trust health, retrieval, reasoning, and embedded dashboard |
+| `selfhost.mjs` | Node self-host adapter for the Worker runtime |
+| `selfhost/python_server.py` | Minimal Python algorithmic fallback service; not a replacement for the Worker ingestion runtime |
+
+### Authorized collectors and direct ingestion
+
+| File | Purpose |
+|---|---|
+| `collector/README.md` | Collector setup, protocol, visibility, and authorization boundaries |
+| `collector/ingestion_protocol.py` | Single direct transport implementation for authentication, batch limits, retry/backoff, graceful failure, and audit logging |
+| `collector/local_linux_collector.py` | Read-only local `/proc` fallback collector, explicitly labeled `container-local` |
+| `collector/osquery_collector.py` | Fixed-query osquery collector for an authorized Linux host |
+| `collector/osquery-lab.json` | Local-only collector configuration, endpoint identity, ingestion URL, and token environment |
+
+### Data, contracts, and evidence governance
+
+| File | Purpose |
+|---|---|
+| `schema-corpora.sql` | SQLite/D1 schema for corpus, knowledge, evaluation, EDR, detection, rejection, and feedback data |
+| `contracts/observatory-reasoning.v1.json` | Machine-readable evidence and reasoning contract |
+| `docs/AI-THREAT-OBSERVATORY-REASONING.md` | Human-readable Observatory reasoning and knowledge-layer specification |
+
+### Documentation, audit, licensing, and attribution
+
+| File | Purpose |
+|---|---|
+| `README.md` | Public product, deployment, safety, runtime, and integration documentation |
+| `ARCHITECTURE-MAP.md` | Canonical file ownership, source-of-truth rules, boundaries, and verification map |
+| `AUDIT-REPORT.md` | Full-system validation, EDR health, and known limitation report |
+| `CREDITS.md` | Existing project and upstream attribution record |
+| `UPSTREAM-CREDITS.md` | Consolidated creators, projects, licenses, and reference-only attribution |
+| `INGEST-LOG.md` | Ingestion history and provenance notes |
+| `CHANGELOG.md` | This release history and complete repository manifest |
+
+### Release-level system summary
+
+Corpora AI is organized as a defensive evidence and telemetry system rather than a single script. The supported path is local `/proc` or authorized osquery collection, one shared direct ingestion protocol, an ingestion API that owns provenance and validation, event hashing and deduplication, telemetry-trust health, detection and correlation, evidence retrieval and reasoning, and a dashboard that exposes uncertainty and visibility boundaries. The Node adapter remains intentionally present as the self-hosted runtime/API boundary. The Python service remains a limited algorithmic fallback. No file in this manifest authorizes external scanning, arbitrary command execution, malware execution, retaliation, or unsupported actor attribution.
+
+At this release, the local `/proc` path has been exercised successfully in the container-local environment. The osquery collector is syntax-tested and fail-closed, but host-level osquery collection remains unverified until `osqueryi` is installed and run on the authorized self-hosted Linux host.
