@@ -1,6 +1,7 @@
 node_modules/
-.wrangler/
-.wrangler-dry-run/
-__pycache__/
-*.pyc
-collector/*.jsonl
+.env
+.env.*
+!.env.example
+coverage/
+*.log
+.DS_Store

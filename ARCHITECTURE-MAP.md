@@ -1,76 +1,45 @@
-# Corpora AI architecture map
+# Project Compass Architecture
 
-## Canonical runtime path
+## Overview
+
+Project Compass is a dependency-free, self-hosted Node.js application. The browser presents a five-step project assessment. The server validates the submission, runs a transparent methodology comparison, and returns a decision brief. An optional OpenAI-compatible adapter can add narrative context without changing the baseline ranking.
 
 ```text
-/proc fallback or osquery
-        ↓
-collector/ingestion_protocol.py
-        ↓  Bearer authentication, bounded batch, retry/backoff, local audit log
-POST /api/edr/ingest
-        ↓
-server-owned provenance and visibility
-        ↓
-schema validation, event hash, deduplication
-        ↓
-heartbeat and telemetry-trust health
-        ↓
-detection, correlation, audit response
-        ↓
-Worker API and dashboard
+Browser
+  ├─ browser-local draft storage
+  ├─ multi-step validation
+  └─ POST /api/recommend
+          │
+          ▼
+Node HTTP server
+  ├─ request limits and security headers
+  ├─ field validation
+  ├─ transparent scoring engine
+  │     ├─ project signal derivation
+  │     ├─ seven-method comparison
+  │     └─ tradeoffs and operating blueprint
+  └─ optional AI narrative adapter
+        └─ configured OpenAI-compatible provider
 ```
 
-The self-host adapter remains the runtime that exposes the ingestion API. It is not a second collector protocol implementation and is intentionally retained as the deployment boundary.
+## Trust boundaries
 
-## File ownership map
+The browser stores the in-progress draft in `localStorage`. The Node service is stateless and does not include a database. A recommendation request is processed in memory. Optional AI mode is disabled unless the server operator explicitly sets `AI_MODE=on` and provides a key.
 
-| Layer | Canonical files | Role | Status |
-|---|---|---|---|
-| Local collection | `collector/local_linux_collector.py` | Read-only `/proc` fallback; explicitly `container-local` | Critical, tested |
-| SSH telemetry | `collector/ssh_local_telemetry.py`, `collector/ssh-local.json` | Read-only local process/listening-port evidence; direct authenticated relay | Critical, syntax-tested |
-| SSH deception | `collector/ssh_honeypot.py`, `collector/ssh-honeypot.json` | `127.0.0.1:2222` banner-only listener; records attempts without execution | Bounded, syntax-tested |
-| Cyber-range simulation | `src/index.js` `/api/range/c2/*` routes | Synthetic agents, fixed tasks, detection, range-only containment | Critical, end-to-end tested |
-| Threat model | `THREAT-MODEL.md` | Security properties, attack surfaces, limitations, and residual uncertainty | Reviewed |
-| Evidence governance | `docs/EVIDENCE-LEGAL-GOVERNANCE.md`, `contracts/evidence-governance.v1.json` | Best-evidence metadata, chain of custody, integrity failures, legal holds, and counsel boundaries | Reviewed, UI profile added |
-| Legal sources | `contracts/legal-sources.v1.json` | Versioned federal, Michigan, and EU reference links with review status | Reference-only |
-| Data-flow diagnostics | `src/index.js` `/api/governance/diagnostics` | Secret-free checks and self-repair guidance for localhost, encryption, database, and collector configuration | Live-smoke-tested |
-| Privacy intelligence | `docs/PRIVACY-INTELLIGENCE.md`, browser-local scan in `src/index.js` | Organization-level broker graph, customer-controlled pasted-material scan, storage disclosure, opt-out guidance | Browser-local; no broker crawling |
-| Host collection | `collector/osquery_collector.py` | Fixed read-only osquery queries; intended for authorized host-level collection | Critical, syntax-tested; live osquery unverified because `osqueryi` is absent |
-| Collector protocol | `collector/ingestion_protocol.py` | One source of truth for auth, 64 KiB batch bound, retry/backoff, failure state, and JSONL audit | Critical, tested |
-| Collector policy | `collector/osquery-lab.json` | Local-only target, endpoint identity, ingestion URL, token environment | Critical, parsed |
-| Collector documentation | `collector/README.md` | Protocol, visibility, and host/container boundary | Tested/documented |
-| Ingestion API | `src/index.js` (`handleAuthorizedCollectorIngest`) | Bearer gate, lab-policy gate, server-owned collector and visibility | Critical, tested |
-| Normalization/detection | `src/index.js` (`handleEdrEvents`, `detectEdrEvent`) | Version checks, required fields, event IDs, server hashes, dedupe, detection and audit stages | Critical, tested |
-| Trust/health | `src/index.js` (`handleEdrHealth`, `EDR_HEALTH`) | Freshness, heartbeat, duplicate/rejection/auth/timestamp counters, `VERIFIED`/`DEGRADED`/`UNVERIFIED` | Critical, tested |
-| Evidence/reasoning | `src/index.js` (`handleKnowledgeRetrieve`, `handleObservatoryProof`) | Content retrieval, provenance-labeled proof, skeptic pass, bounded simulation plan | Critical, smoke-tested |
-| Browser UI | `src/index.js` embedded `PAGE`, `PAGE_CSS`, `PAGE_JS` | Dashboard, synthetic canary, retrieval, proof, and server-derived health display | Coupled to Worker shell, syntax-tested |
-| Data schema | `schema-corpora.sql` | D1 tables for corpus, sources, documents, claims, EDR events/detections/rejections | Canonical schema, SQLite-parsed |
-| Deployment config | `wrangler.toml` | Canonical Worker entry point and D1 binding | Canonical |
-| Runtime config | `package.json`, `package-lock.json`, `.nvmrc` | Node 24 engine and locked Wrangler 4 | Canonical, Node 24 validated |
-| CI/deployment | `.github/workflows/deploy.yml` | Node version from `.nvmrc`, `npm ci`, locked `npm exec -- wrangler` | Canonical, manual deploy |
-| Python fast path | `selfhost/python_server.py` | Minimal algorithmic fallback; does not replace the Worker ingestion runtime | Separate, intentionally limited |
-| Policy/contracts | `contracts/observatory-reasoning.v1.json`, `docs/AI-THREAT-OBSERVATORY-REASONING.md` | Reasoning and evidence-governance contract | Reference/policy |
-| Attribution | `CREDITS.md`, `UPSTREAM-CREDITS.md`, `NOTICE.md` | Upstream credit and license boundary | Documentation |
+The deterministic engine owns the ranking. The AI adapter can only add an executive summary, a tradeoff narrative, and validation questions. A provider failure returns the baseline output instead of failing the product decision flow.
 
-## Source-of-truth rules
+## Canonical files
 
-1. **Collector transport:** `collector/ingestion_protocol.py` is the only collector-side transport implementation. Collectors must not implement their own auth, retry, or HTTP logic.
-2. **Server provenance:** `src/index.js` assigns `SYNTHETIC_FIXTURE` or `LIVE_LOCAL_OBSERVATION`; client-supplied labels are not trusted.
-3. **Event identity:** collectors create deterministic event IDs for replay control, while the server independently calculates `observationId` hashes and owns deduplication.
-4. **Visibility:** `container-local` is not promoted to `host-level`. Host-level visibility requires an authorized osquery deployment on the actual self-hosted host.
-5. **Schema:** `schema-corpora.sql` is the D1 schema source. The Worker API is the runtime contract.
-6. **Deployment:** `wrangler.toml` is the only deploy configuration. Node 24 and locked Wrangler are defined by `package.json`, `package-lock.json`, and `.nvmrc`.
+| File | Responsibility |
+| --- | --- |
+| `src/server.js` | HTTP runtime, security headers, request limits, static assets, APIs, and optional AI adapter |
+| `src/recommendation-engine.js` | Input normalization, validation, methodology profiles, ranking, confidence, tradeoffs, and blueprint |
+| `public/index.html` | Assessment and decision-brief semantics |
+| `public/styles.css` | Responsive visual system and print layout |
+| `public/app.js` | Browser state, draft persistence, step navigation, validation, result rendering, print, and JSON export |
+| `test/*.test.js` | Unit and integration verification |
+| `Dockerfile` and `compose.yaml` | Portable self-host packaging |
 
-## Boundary findings
+## Deployment boundary
 
-| Finding | Classification | Action |
-|---|---|---|
-| Adapter and collector are separate concerns | Intentional coupling | Keep adapter as ingestion API/runtime boundary; collectors speak one direct protocol |
-| Embedded Worker frontend and backend share `src/index.js` | Coupled but deliberate | Preserve until a larger module split is justified by tests |
-| Node self-host and Python fallback both exist | Separate runtime | Python is explicitly limited and must not be treated as a second EDR implementation |
-| Live osquery is unavailable in this environment | Unverified capability | Do not claim host-level EDR until `osqueryi` is installed and exercised on the authorized host |
-| Local audit log is runtime-generated | Expected artifact | Ignored by Git; retained on the self-hosted runtime |
-
-## Verification coverage
-
-The direct protocol has passed syntax checks, successful localhost ingestion, server-owned visibility verification, heartbeat recovery, malformed-event rejection, authentication rejection, and bounded retry testing against an unreachable localhost port. The adapter remains present and was not removed. No external target or remote host was contacted.
+The repository has no Cloudflare Worker, D1, Wrangler, or platform-specific binding. It runs on any Node 20+ host or container runtime. Production deployments should place the service behind an HTTPS reverse proxy and inject optional AI credentials as server-side environment variables.

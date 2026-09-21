@@ -1,17 +1,17 @@
 {
-  "name": "corpora-ai",
-  "version": "1.0.0",
+  "name": "project-compass",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
+  "description": "Self-hosted project delivery methodology decision-support advisor.",
   "engines": {
-    "node": ">=24.0.0 <25.0.0"
+    "node": ">=20.0.0"
   },
   "scripts": {
-    "start": "node selfhost.mjs",
-    "selfhost": "node selfhost.mjs",
-    "wrangler:dry-run": "wrangler deploy --dry-run --outdir .wrangler-dry-run"
-  },
-  "devDependencies": {
-    "wrangler": "^4.135.0"
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "check": "node --check src/server.js && node --check src/recommendation-engine.js && node --check public/app.js",
+    "test": "node --test",
+    "verify": "npm run check && npm test"
   }
 }

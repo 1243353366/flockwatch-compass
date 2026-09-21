@@ -1,21 +1,18 @@
 {
-  "name": "Corpora AI",
-  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-24-bookworm",
+  "name": "Project Compass",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
   "forwardPorts": [8787],
   "portsAttributes": {
     "8787": {
-      "label": "Corpora AI",
+      "label": "Project Compass",
       "onAutoForward": "openBrowser"
     }
   },
   "postCreateCommand": "npm ci",
-  "postStartCommand": "npm run selfhost",
+  "postStartCommand": "npm start",
   "customizations": {
     "vscode": {
-      "settings": {
-        "nodejs.experimental.useWsl": false
-      },
-      "extensions": ["dbaeumer.vscode-eslint"]
+      "extensions": []
     }
   }
 }
