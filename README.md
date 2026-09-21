@@ -1,22 +1,22 @@
 # Project Compass
 
-**Project Compass** is a self-hosted decision-support tool that helps project managers decide **how a project should run**. It compares the project’s budget, deadline, organizational structure, goals, uncertainty, constraints, dependencies, and team capabilities against seven distinct delivery approaches.
+**Project Compass** is a Render-hosted decision-support tool that helps project managers decide **how a project should run**. It analyzes purpose-authorized company context, identifies opportunities and problems that materially affect the stated objective, compares seven delivery approaches, and turns recommendations into executable plans and delivery frameworks.
 
-The product returns a primary recommendation, credible alternatives, material tradeoffs, expected leverage, and a lightweight operating blueprint. It does not present the recommendation as objective truth or promise savings. The project manager remains accountable for the decision.
+Every recommendation preserves an auditable **Evidence → Interpretation → Recommendation → Action → Owner → Dependency → Success criterion** chain. The product does not present recommendations as objective truth, promise savings, or perform external actions. The project manager remains accountable for the decision.
 
 ## What changed in version 2
 
-The repository has been fully repurposed from its previous corpus-analysis and Cloudflare Worker implementation. The Cloudflare runtime, bindings, database schema, cybersecurity tooling, and deployment workflow have been removed. Version 2 runs as a dependency-free Node.js service and can also be packaged with Docker.
+The repository has been fully repurposed from its previous corpus-analysis and Cloudflare Worker implementation. The Cloudflare runtime, bindings, database schema, and deployment workflow have been removed. Version 2 runs as a portable Node.js service on Render and can also be packaged with Docker. Queue dependencies are isolated to the staged private worker path.
 
 ## Product capabilities
 
 Project Compass collects a structured decision brief across five steps:
 
-1. **Project basics:** budget, budget flexibility, deadline or completion window, urgency, and project objective.
+1. **Project basics:** optional, approximate, or exact budget; budget period and flexibility; deadline or completion window; urgency; and project objective.
 2. **Goals and structure:** company goals, department goals, team goals, organizational hierarchy, approval load, and non-negotiable outcomes.
 3. **Delivery realities:** scope certainty, expected change, desired cadence, compliance burden, and known constraints.
-4. **Team and capabilities:** team size, distribution, stakeholder access, dependency load, interruptions, skills, and optional preferences.
-5. **Review:** a human-readable summary before the recommendation is generated.
+4. **Team and capabilities:** total employees, relevant team size, available personnel, hiring constraints, distribution, stakeholder access, dependency load, interruptions, skills, and optional preferences.
+5. **Review and authorization:** a human-readable summary, required company-use authorization, separate quarterly and training scopes, and a conditional high-risk information override.
 
 The engine evaluates **Scrum, Kanban, Predictive delivery, Predictive–Agile Hybrid, Critical Chain, Shape Up, and Scrumban**. These methods are intentionally different enough to expose meaningful tradeoffs rather than presenting several near-identical agile frameworks.
 
@@ -86,17 +86,20 @@ AI_MODEL=gpt-4o-mini
 
 ### `POST /api/recommend`
 
-Accepts the assessment payload and returns the complete decision brief. Successful responses include:
+Accepts the assessment payload after the browser obtains a one-time grant from `GET /api/request-token`. Requests require the origin-bound binding cookie, `X-Request-Token`, a fresh `X-Request-Timestamp`, and a unique `X-Idempotency-Key`. Successful responses include:
 
 - the primary method, fit score, and directional confidence;
 - rationale and decision factors;
 - strengths, watchouts, and context-specific tailoring;
 - directional leverage across time, money, human effort, and operational friction;
-- an operating blueprint;
+- objective-impact opportunities and problems;
+- three traceable recommendations with evidence, interpretation, action, owner, dependency, and success criterion;
+- a first-30-days execution plan and delivery framework;
+- a 90-day plan only when quarterly planning is separately authorized;
 - three alternatives with selection tradeoffs;
 - optional AI-generated interpretation when configured.
 
-The endpoint is rate-limited in memory, accepts at most 64 KB of JSON, and returns field-level validation errors with HTTP `422`.
+The payload must include `dataUseAuthorized: true`. Quarterly planning, training, and high-risk information are separate scopes. Training remains disabled even when requested. Confidential or high-risk information also requires selected categories, authority confirmation, and an accepted versioned informed-risk override. The endpoint refuses requests that exceed the granted purpose or request denied capabilities.
 
 ### `GET /api/methodologies`
 
@@ -108,11 +111,17 @@ Reports the Node runtime, recommendation-engine version, optional AI configurati
 
 ## Privacy and data handling
 
-The service has **no database and no account system**. Assessment drafts are saved in the user’s browser with `localStorage` so a page refresh does not destroy in-progress work. The user can clear that draft from the interface.
+The production service is hosted on Render and has **no application database and no account system**. Assessment drafts are saved in the user’s browser with `localStorage` so a page refresh does not destroy in-progress work. The authorization checkbox is not saved in the browser draft and must be reconfirmed after a refresh or new session. The user can clear the rest of the draft from the interface.
 
-A completed assessment is posted to the self-hosted Node service only when the user selects **Generate recommendation**. The baseline engine processes it in memory and does not persist it. When optional AI mode is enabled, the assessment and baseline recommendation are sent to the configured OpenAI-compatible provider; that provider’s data terms then apply.
+A completed assessment is posted to the Render-hosted Node service only after the submitter confirms they are authorized to share the company information and permits Project Compass to use it only for recommendations, plans, and delivery frameworks for that company. The authorization does not permit unrelated use, disclosure, or secondary processing. The baseline engine processes the brief in memory and does not persist it. When optional AI mode is enabled, the authorized assessment and baseline recommendation are sent to the configured OpenAI-compatible provider for the same stated purposes; that provider’s data terms then apply.
 
 The application includes a strict Content Security Policy, denies framing, disables browser access to camera, microphone, geolocation, and payments, and avoids third-party frontend scripts.
+
+## Security and worker architecture
+
+The application uses a deny-by-default capability policy outside the reasoning layer. The PM can read authorized project data, analyze evidence, generate recommendations, plans, and frameworks, inspect permitted task state, and recommend deployment work. It cannot execute a shell, read credentials, deploy production, access arbitrary networks, cross tenants, delegate capabilities, escalate privileges, or perform external actions.
+
+The public gateway enforces one-time request tokens, strict origins, replay timestamps, idempotency keys, body limits, burst and minute rate limits, and global concurrency controls. Optional AI work is isolated behind a bounded local queue and is disabled in production. A free private Render Key Value queue has been provisioned; a dedicated paid Background Worker is staged in `render-worker.yaml` but is not activated because it would create a charge. See `THREAT-MODEL.md` and `ARCHITECTURE-MAP.md` for the full boundary and production gates.
 
 ## Recommendation logic
 
@@ -139,7 +148,7 @@ These scores are **comparative heuristics**, not empirical success probabilities
 npm run verify
 ```
 
-The verification command checks JavaScript syntax and runs Node’s native test suite. Tests cover adaptive product work, regulated plan-driven work, interrupt-driven flow, response completeness, validation, static delivery, and the health endpoint.
+The verification command checks JavaScript syntax and runs Node’s native test suite. Tests cover method fit, objective-impact traceability, separate consent scopes, high-risk overrides, origin checks, one-time-token replay, denied capabilities, and static delivery.
 
 ## Repository structure
 
@@ -149,11 +158,18 @@ public/
   styles.css                 Responsive visual system
   app.js                     Browser state, validation, rendering, and export
 src/
-  recommendation-engine.js   Transparent scoring, tradeoffs, and blueprint logic
-  server.js                  Self-hosted Node HTTP server and optional AI adapter
+  recommendation-engine.js   Objective analysis, scoring, traceability, and plans
+  capability-policy.js       Deny-by-default non-transitive capability grants
+  server.js                  Secure public gateway and bounded AI queue
+worker/
+  index.js                   Private Render planning worker entry point
 test/
+  capability-policy.test.js
   recommendation-engine.test.js
   server.test.js
+THREAT-MODEL.md
+ARCHITECTURE-MAP.md
+render-worker.yaml           Staged paid worker definition
 Dockerfile
 compose.yaml
 .env.example

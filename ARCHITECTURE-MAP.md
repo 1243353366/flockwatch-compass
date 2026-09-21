@@ -2,44 +2,88 @@
 
 ## Overview
 
-Project Compass is a dependency-free, self-hosted Node.js application. The browser presents a five-step project assessment. The server validates the submission, runs a transparent methodology comparison, and returns a decision brief. An optional OpenAI-compatible adapter can add narrative context without changing the baseline ranking.
+Project Compass is the **business intelligence and project-management layer**. It accepts purpose-authorized company context, tests whether the information materially affects the stated objective, identifies opportunities and problems, recommends a delivery approach, and turns the recommendation into an executable plan and framework. It does not treat the recommendation as objective truth and does not execute external actions.
 
 ```text
 Browser
-  ├─ browser-local draft storage
-  ├─ multi-step validation
-  └─ POST /api/recommend
+  ├─ browser-local draft (consent is never persisted)
+  ├─ explicit purpose and high-risk information gates
+  └─ one-time request token + timestamp + idempotency key
           │
           ▼
-Node HTTP server
-  ├─ request limits and security headers
-  ├─ field validation
-  ├─ transparent scoring engine
-  │     ├─ project signal derivation
-  │     ├─ seven-method comparison
-  │     └─ tradeoffs and operating blueprint
-  └─ optional AI narrative adapter
-        └─ configured OpenAI-compatible provider
+Public Render gateway
+  ├─ origin, replay, size, burst, and concurrency controls
+  ├─ consent and purpose policy
+  ├─ deny-by-default capability policy
+  ├─ input validation
+  └─ transparent planning engine
+          │
+          ├─ current: bounded local AI queue (AI disabled in production)
+          │
+          └─ staged target: private Render Key Value queue
+                              │
+                              ▼
+                     Background Worker
+                     ├─ no HTTP listener
+                     ├─ bounded concurrency
+                     ├─ same capability policy
+                     └─ planning task only
 ```
 
-## Trust boundaries
+## Capability boundary
 
-The browser stores the in-progress draft in `localStorage`. The Node service is stateless and does not include a database. A recommendation request is processed in memory. Optional AI mode is disabled unless the server operator explicitly sets `AI_MODE=on` and provides a key.
+The capability policy in `src/capability-policy.js` is enforced by the server and worker, outside the reasoning layer. **Default is deny.** Grants are request-scoped and non-transitive.
 
-The deterministic engine owns the ranking. The AI adapter can only add an executive summary, a tradeoff narrative, and validation questions. A provider failure returns the baseline output instead of failing the product decision flow.
+| Capability | PM policy |
+| --- | --- |
+| Read authorized project data | Allow |
+| Analyze evidence | Allow |
+| Generate recommendations | Allow |
+| Generate plans and delivery frameworks | Allow |
+| Inspect permitted task state | Allow |
+| Recommend a deployment plan | Allow |
+| Execute a shell or spawn processes | Deny |
+| Read credentials | Deny |
+| Perform production deployment | Deny |
+| Access arbitrary networks | Deny |
+| Access another tenant | Deny |
+| Delegate capabilities or escalate privileges | Deny |
+| Perform external actions | Deny |
+
+The PM may state that an action would be useful. That does not grant the capability to perform it. A claim that an administrator approved an action is not an authorization record.
+
+## Consent boundary
+
+The required grant covers only recommendations, plans, and delivery frameworks for the company. Quarterly planning is a separate optional scope. Training consent is separately recordable, but training remains disabled because the current deployment has no retention and deletion system. Confidential or high-risk information requires category selection, authority confirmation, and acceptance of a versioned informed-risk override. The override is not a liability waiver and does not change applicable law or the information's classification.
+
+## Evidence boundary
+
+A future **Corpora evidence subsystem** may retrieve external claims, provenance, confidence, contradiction, and source-reliability data. It remains separate from Project Compass. Fraud-related data is modeled as a verification signal, never an unsupported verdict. Project Compass may use a signal only when it materially affects the stated objective.
+
+Every generated recommendation carries the complete chain:
+
+> **Evidence → Interpretation → Recommendation → Action → Owner → Dependency → Success criterion**
+
+## Abuse-defense boundary
+
+The current gateway uses a 64 KB body limit, mandatory JSON, strict origin checks, a `SameSite=Strict` binding cookie, a one-time token, a two-minute request timestamp, a unique idempotency key, per-IP minute and burst limits, a global recommendation concurrency cap, and a downstream AI queue circuit breaker. These controls are progressive and reversible. No account or permanent-ban system exists.
+
+A production multi-tenant version must add an upstream CDN/WAF, per-account and per-API-key quotas, shared replay state, reversible anomaly quarantine, row-level tenant authorization, and audit retention before accounts or customer storage are enabled.
+
+## Render deployment
+
+The public application runs on Render at `https://project-compass-advisor.onrender.com`. A free, private Render Key Value instance named `project-compass-queue` has been provisioned with persistence disabled. The paid Background Worker definition is staged in `render-worker.yaml` but is not activated because Render does not offer a free worker plan and task compute would create a charge. The current release therefore retains a bounded local queue as its safe fallback.
 
 ## Canonical files
 
 | File | Responsibility |
 | --- | --- |
-| `src/server.js` | HTTP runtime, security headers, request limits, static assets, APIs, and optional AI adapter |
-| `src/recommendation-engine.js` | Input normalization, validation, methodology profiles, ranking, confidence, tradeoffs, and blueprint |
-| `public/index.html` | Assessment and decision-brief semantics |
-| `public/styles.css` | Responsive visual system and print layout |
-| `public/app.js` | Browser state, draft persistence, step navigation, validation, result rendering, print, and JSON export |
-| `test/*.test.js` | Unit and integration verification |
-| `Dockerfile` and `compose.yaml` | Portable self-host packaging |
-
-## Deployment boundary
-
-The repository has no Cloudflare Worker, D1, Wrangler, or platform-specific binding. It runs on any Node 20+ host or container runtime. Production deployments should place the service behind an HTTPS reverse proxy and inject optional AI credentials as server-side environment variables.
+| `src/server.js` | Public gateway, token and replay controls, rate limits, static assets, APIs, bounded AI queue |
+| `src/capability-policy.js` | Deny-by-default, non-transitive PM capability policy |
+| `src/recommendation-engine.js` | Authorization validation, objective-impact analysis, method comparison, traceable recommendations, execution and quarterly plans |
+| `worker/index.js` | Private queue worker with no HTTP listener |
+| `public/index.html` | Intake, consent, warnings, analysis, and plan semantics |
+| `public/app.js` | Browser-local state, secure submission, validation, rendering, export |
+| `THREAT-MODEL.md` | Adversarial assumptions, controls, residual risks, and production gates |
+| `render-worker.yaml` | Staged paid worker definition; not connected automatically |
+| `test/*.test.js` | Decision, consent, replay, origin, and capability-policy verification |

@@ -18,7 +18,7 @@
     </a>
     <div class="header-actions">
       <a class="text-link" href="#how-it-works">How it works</a>
-      <span class="privacy-note"><span class="status-dot"></span> No account required</span>
+      <span class="privacy-note"><span class="status-dot"></span> Explicit permission required</span>
       <button class="icon-button" id="theme-toggle" type="button" aria-label="Switch color theme">
         <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
       </button>
@@ -31,6 +31,7 @@
         <p class="eyebrow">Decide how the project should run</p>
         <h1 id="page-title">Turn project realities into a practical delivery approach.</h1>
         <p class="intro-copy">Compare methodologies against your budget, deadline, goals, governance, and team. The result is a transparent recommendation with alternatives and tradeoffs—not another task board.</p>
+        <p class="workflow-line">Authorized information <span>→</span> objective-impact analysis <span>→</span> recommendations <span>→</span> executable plans and delivery frameworks</p>
       </div>
       <div class="intro-proof" aria-label="Product characteristics">
         <span>Transparent scoring</span>
@@ -54,7 +55,7 @@
         </ol>
         <div class="rail-callout">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-3.5 8-10V5l-8-3-8 3v7c0 6.5 8 10 8 10Z"></path><path d="m9 12 2 2 4-4"></path></svg>
-          <p><strong>Your draft stays in this browser.</strong><br>Project inputs are sent to the self-hosted server only when you request a recommendation.</p>
+          <p><strong>Your draft stays in this browser.</strong><br>Project inputs are sent to the Render-hosted service only when you request a recommendation.</p>
         </div>
       </aside>
 
@@ -73,16 +74,31 @@
               <input id="project-name" name="projectName" type="text" maxlength="120" placeholder="e.g. Customer onboarding redesign" autocomplete="off">
             </div>
 
-            <div class="field-grid three-columns">
-              <div class="field field-span-2">
-                <label for="budget">Project budget</label>
+            <div class="field-grid">
+              <div class="field">
+                <label for="budget-disclosure">Budget information</label>
+                <select id="budget-disclosure" name="budgetDisclosure">
+                  <option value="none">No budget information</option>
+                  <option value="approximate" selected>Approximate budget</option>
+                  <option value="exact">Exact budget</option>
+                </select>
+              </div>
+              <div class="field" id="budget-amount-field">
+                <label for="budget">Budget amount</label>
                 <div class="money-input">
                   <select id="currency" name="currency" aria-label="Budget currency">
                     <option value="USD">USD</option><option value="EUR">EUR</option><option value="GBP">GBP</option><option value="CAD">CAD</option><option value="AUD">AUD</option><option value="JPY">JPY</option><option value="INR">INR</option><option value="OTHER">Other</option>
                   </select>
-                  <input id="budget" name="budget" type="number" min="1" max="1000000000000" step="100" inputmode="decimal" placeholder="250,000" required>
+                  <input id="budget" name="budget" type="number" min="1" max="1000000000000" step="100" inputmode="decimal" placeholder="250,000">
                 </div>
                 <p class="field-error" data-error-for="budget"></p>
+              </div>
+            </div>
+
+            <div class="field-grid">
+              <div class="field">
+                <label for="budget-period">Budget period</label>
+                <select id="budget-period" name="budgetPeriod"><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="annual">Annual</option><option value="project" selected>Project</option></select>
               </div>
               <div class="field">
                 <label for="budget-flexibility">Budget flexibility</label>
@@ -93,6 +109,7 @@
                 </select>
               </div>
             </div>
+            <p class="purpose-note"><strong>Why this is asked:</strong> Budget and team-size information constrain recommendations and delivery plans to the resources the organization identifies as available.</p>
 
             <div class="field-grid three-columns">
               <div class="field">
@@ -226,10 +243,21 @@
 
             <div class="field-grid three-columns">
               <div class="field">
-                <label for="team-size">Core team size</label>
+                <label for="total-employees">Total employees <span>Optional</span></label>
+                <input id="total-employees" name="totalEmployees" type="number" min="0" max="10000000" placeholder="e.g. 450">
+              </div>
+              <div class="field">
+                <label for="team-size">Relevant team size</label>
                 <input id="team-size" name="teamSize" type="number" min="1" max="500" value="6" required>
                 <p class="field-error" data-error-for="teamSize"></p>
               </div>
+              <div class="field">
+                <label for="available-personnel">Available personnel <span>Optional</span></label>
+                <input id="available-personnel" name="availablePersonnel" type="number" min="0" max="500" placeholder="e.g. 5">
+              </div>
+            </div>
+
+            <div class="field-grid three-columns">
               <div class="field">
                 <label for="distribution">Working model</label>
                 <select id="distribution" name="distribution"><option value="colocated">Mostly co-located</option><option value="hybrid" selected>Hybrid</option><option value="distributed">Fully distributed</option></select>
@@ -237,6 +265,10 @@
               <div class="field">
                 <label for="preference">Existing preference <span>Optional</span></label>
                 <select id="preference" name="preference"><option value="none" selected>No strong preference</option><option value="agile">Agile / sprint-based</option><option value="flow">Flow / Kanban</option><option value="structured">Structured / plan-driven</option><option value="hybrid">Hybrid</option></select>
+              </div>
+              <div class="field">
+                <label for="hiring-constraints">Hiring constraints <span>Optional</span></label>
+                <input id="hiring-constraints" name="hiringConstraints" type="text" maxlength="2000" placeholder="e.g. No new hires this quarter">
               </div>
             </div>
 
@@ -281,6 +313,67 @@
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01"></path></svg>
               <p><strong>Decision support, not objective truth.</strong> The recommendation will reflect the supplied information and an explicit comparison model. It cannot know unreported political, commercial, or operational context. Use it to structure a leadership decision, then validate it with the team.</p>
             </div>
+
+            <div class="authorization-card">
+              <p class="authorization-kicker">1 · Required company-information authorization</p>
+              <label class="authorization-control" for="data-use-authorized">
+                <input id="data-use-authorized" name="dataUseAuthorized" type="checkbox" value="yes" required>
+                <span><strong>I confirm that I am authorized to share this company and project information.</strong><small>I authorize its use only to develop recommendations, plans, and delivery frameworks for the company described above.</small></span>
+              </label>
+              <p class="authorization-detail"><strong>Purpose limitation.</strong> This permission applies only to information I am permitted to provide and only to the purposes stated above. It is not authorization for unrelated uses, disclosure, or secondary processing. This Render-hosted deployment processes the brief in memory and does not store it in an application database. If optional AI assistance is enabled by the operator, the configured provider will also process the authorized brief for the same stated purposes under its own terms.</p>
+              <p class="field-error" data-error-for="dataUseAuthorized"></p>
+            </div>
+
+            <div class="consent-scope-grid">
+              <div class="authorization-card authorization-card-optional">
+                <p class="authorization-kicker">2 · Optional quarterly planning</p>
+                <label class="authorization-control" for="quarterly-planning-authorized">
+                  <input id="quarterly-planning-authorized" name="quarterlyPlanningAuthorized" type="checkbox" value="yes">
+                  <span><strong>I authorize use for quarterly planning.</strong><small>Project Compass may use the submitted information to produce a 90-day plan and planning-cycle recommendations.</small></span>
+                </label>
+              </div>
+
+              <div class="authorization-card authorization-card-optional">
+                <p class="authorization-kicker">3 · Optional training request</p>
+                <label class="authorization-control" for="training-use-authorized">
+                  <input id="training-use-authorized" name="trainingUseAuthorized" type="checkbox" value="yes">
+                  <span><strong>I request and authorize training use.</strong><small>This deployment does not retain submissions or train on them. The request is recorded but remains disabled until stated retention, security, and deletion controls are configured.</small></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="high-risk-warning">
+              <div class="warning-heading"><span aria-hidden="true">!</span><div><p class="authorization-kicker">4 · Confidential or high-risk information</p><strong>Do not submit sensitive information by default.</strong></div></div>
+              <p>Do not submit trade secrets, credentials, authentication tokens, personal data, regulated information, or other highly sensitive material unless you are authorized to disclose it and have reviewed your organization's requirements. Providing information to this system does not change its legal classification or your organization's confidentiality obligations.</p>
+              <label class="authorization-control" for="confidential-info-included">
+                <input id="confidential-info-included" name="confidentialInfoIncluded" type="checkbox" value="yes">
+                <span><strong>This submission includes confidential or otherwise high-risk information.</strong><small>Additional category, authorization, and informed-risk override controls will be required.</small></span>
+              </label>
+
+              <div class="high-risk-panel" id="high-risk-panel" hidden>
+                <fieldset class="field">
+                  <legend>Categories included <span>Select all that apply</span></legend>
+                  <div class="risk-category-grid">
+                    <label><input type="checkbox" name="highRiskCategories" value="confidential"><span>Confidential</span></label>
+                    <label><input type="checkbox" name="highRiskCategories" value="proprietary"><span>Proprietary</span></label>
+                    <label><input type="checkbox" name="highRiskCategories" value="trade-secret"><span>Trade secret</span></label>
+                    <label><input type="checkbox" name="highRiskCategories" value="personal"><span>Personal data</span></label>
+                    <label><input type="checkbox" name="highRiskCategories" value="regulated"><span>Regulated</span></label>
+                    <label><input type="checkbox" name="highRiskCategories" value="other-sensitive"><span>Other sensitive</span></label>
+                  </div>
+                  <p class="field-error" data-error-for="highRiskCategories"></p>
+                </fieldset>
+                <label class="authorization-control" for="confidential-info-authorized">
+                  <input id="confidential-info-authorized" name="confidentialInfoAuthorized" type="checkbox" value="yes">
+                  <span><strong>I am authorized to disclose and process the identified categories.</strong><small>The authorization applies only to the purposes selected above.</small></span>
+                </label>
+                <input id="high-risk-override-accepted" name="highRiskOverrideAccepted" type="hidden" value="no">
+                <div class="override-row"><button class="button button-ghost" id="review-high-risk-override" type="button">Review informed-risk override</button><span id="override-status">Not accepted</span></div>
+                <p class="field-error" data-error-for="confidentialInfoAuthorized"></p>
+                <p class="field-error" data-error-for="highRiskOverrideAccepted"></p>
+              </div>
+            </div>
+            <p class="consent-version">Consent policy: company-data-authorization-2026-09-21-v1</p>
           </section>
 
           <footer class="form-actions">
@@ -308,6 +401,12 @@
 
       <div class="result-disclaimer"><strong>Recommendation, not verdict.</strong><span id="result-notice">Treat this as a decision-support view based on the inputs supplied.</span></div>
 
+      <section class="result-section objective-analysis-section">
+        <div class="section-heading"><div><p class="eyebrow">Authorized information analysis</p><h3 id="materiality-question">Does this information materially affect the organization's stated objective?</h3></div><p id="materiality-answer"></p></div>
+        <blockquote id="analysis-objective"></blockquote>
+        <div class="insight-columns"><div><h4>Opportunities</h4><div id="opportunity-list" class="insight-list"></div></div><div><h4>Problems to resolve</h4><div id="problem-list" class="insight-list"></div></div></div>
+      </section>
+
       <section class="recommendation-hero">
         <div class="recommendation-copy">
           <div class="result-labels"><span class="pill pill-accent">Recommended operating model</span><span class="pill" id="analysis-mode">Transparent model</span></div>
@@ -320,6 +419,11 @@
           <div class="score-ring" id="fit-score-ring"><span id="fit-score">82</span><small>/ 100 fit</small></div>
           <div><strong id="confidence-label">Moderate directional confidence</strong><p id="confidence-basis"></p></div>
         </div>
+      </section>
+
+      <section class="result-section trace-section">
+        <div class="section-heading"><div><p class="eyebrow">Recommendation traceability</p><h3>Every recommendation connects evidence to accountable execution.</h3></div><p>Evidence → Interpretation → Recommendation → Action → Owner → Dependency → Success criterion</p></div>
+        <div id="recommendation-traces" class="trace-list"></div>
       </section>
 
       <section class="ai-perspective" id="ai-perspective" hidden>
@@ -350,13 +454,19 @@
       </section>
 
       <section class="result-section blueprint-section">
-        <div class="section-heading"><div><p class="eyebrow">Operating blueprint</p><h3>A lightweight way to start</h3></div><p id="blueprint-cadence"></p></div>
+        <div class="section-heading"><div><p class="eyebrow">Executable plan &amp; delivery framework</p><h3>Turn the recommendation into a controlled first 30 days.</h3></div><p id="blueprint-cadence"></p></div>
+        <div class="launch-sequence" id="launch-sequence"></div>
         <div class="blueprint-grid">
           <div><span class="blueprint-number">01</span><h4>Set the roles</h4><ul id="blueprint-roles"></ul></div>
           <div><span class="blueprint-number">02</span><h4>Run the practices</h4><ul id="blueprint-practices"></ul></div>
           <div><span class="blueprint-number">03</span><h4>Protect the system</h4><ul id="blueprint-controls"></ul></div>
         </div>
         <div class="tailoring-row" id="tailoring-row"><strong>Tailor it for this context</strong><ul id="tailoring-list"></ul></div>
+      </section>
+
+      <section class="result-section quarterly-section" id="quarterly-section" hidden>
+        <div class="section-heading"><div><p class="eyebrow">Separately authorized quarterly planning</p><h3>90-day planning cycle</h3></div><p>This section is generated only when the quarterly-planning scope is explicitly selected.</p></div>
+        <div class="quarterly-grid" id="quarterly-grid"></div>
       </section>
 
       <section class="result-section alternatives-section">
@@ -372,16 +482,28 @@
     </section>
 
     <section class="how-it-works" id="how-it-works">
-      <div class="section-heading"><div><p class="eyebrow">How it works</p><h2>A recommendation you can inspect.</h2></div><p>The system compares project signals against distinct operating characteristics—not methodology popularity.</p></div>
+      <div class="section-heading"><div><p class="eyebrow">How it works</p><h2>An objective-linked decision chain you can inspect.</h2></div><p>The system uses authorized information only for selected purposes and does not treat verification signals as fraud verdicts.</p></div>
       <div class="how-grid">
-        <article><span>01</span><h3>Frame the decision</h3><p>Capture the economic, organizational, delivery, and team constraints that change method fit.</p></article>
-        <article><span>02</span><h3>Compare approaches</h3><p>A transparent scoring model evaluates seven distinct approaches. Optional AI adds narrative context but does not silently change the ranking.</p></article>
-        <article><span>03</span><h3>Review the tradeoffs</h3><p>Use the rationale, alternatives, and implementation blueprint to make a human-owned operating decision.</p></article>
+        <article><span>01</span><h3>Authorize the purpose</h3><p>Confirm authority, selected processing purposes, and any high-risk information categories before submission.</p></article>
+        <article><span>02</span><h3>Test objective impact</h3><p>Ask whether each fact materially affects the probability, cost, speed, or effort required to achieve the stated objective.</p></article>
+        <article><span>03</span><h3>Trace the recommendation</h3><p>Connect evidence and interpretation to an action, owner, dependency, and measurable success criterion.</p></article>
+        <article><span>04</span><h3>Execute and review</h3><p>Launch a bounded plan, gather evidence, and adapt the next commitment without turning signals into unsupported verdicts.</p></article>
       </div>
     </section>
   </main>
 
-  <footer class="site-footer"><div class="brand-footer"><strong>Project Compass</strong><span>Self-hosted project delivery decision support.</span></div><p>No accounts. No database. No task tracking. Your server operator controls the runtime and any optional AI connection.</p></footer>
+  <footer class="site-footer"><div class="brand-footer"><strong>Project Compass</strong><span>Project delivery decision support on Render.</span></div><p>No accounts. No application database. No task tracking. Company information is processed only after explicit permission for recommendations, plans, and delivery frameworks.</p></footer>
+
+  <dialog class="risk-dialog" id="high-risk-dialog" aria-labelledby="high-risk-dialog-title">
+    <form method="dialog">
+      <p class="authorization-kicker">High-risk information override</p>
+      <h2 id="high-risk-dialog-title">Review the risk before continuing.</h2>
+      <p>You have been warned that submitting confidential, proprietary, trade-secret, personal, regulated, or otherwise sensitive information may create legal, contractual, security, or confidentiality risks.</p>
+      <p>By continuing, you confirm that you have reviewed these warnings, are authorized to provide the information, understand the selected processing purposes, accept responsibility for determining whether disclosure is permitted, and intentionally choose to proceed despite the warnings.</p>
+      <div class="dialog-warning"><strong>This is not a liability waiver.</strong> It does not override applicable law, change the information's legal classification, or remove your organization's confidentiality obligations.</div>
+      <div class="dialog-actions"><button class="button button-ghost" id="cancel-high-risk-override" value="cancel">Cancel</button><button class="button button-primary" id="accept-high-risk-override" value="accept">I understand and proceed</button></div>
+    </form>
+  </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 </body>

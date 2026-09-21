@@ -46,6 +46,8 @@ function collectInput() {
     projectName: data.get("projectName") || "",
     budget: Number(data.get("budget") || 0),
     currency: data.get("currency") || "USD",
+    budgetDisclosure: data.get("budgetDisclosure") || "approximate",
+    budgetPeriod: data.get("budgetPeriod") || "project",
     budgetFlexibility: data.get("budgetFlexibility") || "fixed",
     deadline: data.get("deadline") || "",
     window: data.get("window") || "3-6-months",
@@ -63,23 +65,43 @@ function collectInput() {
     deliveryCadence: data.get("deliveryCadence") || "milestones",
     constraints: data.get("constraints") || "",
     teamSize: Number(data.get("teamSize") || 6),
+    totalEmployees: Number(data.get("totalEmployees") || 0),
+    availablePersonnel: Number(data.get("availablePersonnel") || 0),
+    hiringConstraints: data.get("hiringConstraints") || "",
     distribution: data.get("distribution") || "hybrid",
     stakeholderAccess: data.get("stakeholderAccess") || "medium",
     dependencyLevel: data.get("dependencyLevel") || "medium",
     interruptionLevel: data.get("interruptionLevel") || "medium",
     preference: data.get("preference") || "none",
+    dataUseAuthorized: data.get("dataUseAuthorized") === "yes",
+    quarterlyPlanningAuthorized: data.get("quarterlyPlanningAuthorized") === "yes",
+    trainingUseAuthorized: data.get("trainingUseAuthorized") === "yes",
+    confidentialInfoIncluded: data.get("confidentialInfoIncluded") === "yes",
+    confidentialInfoAuthorized: data.get("confidentialInfoAuthorized") === "yes",
+    highRiskOverrideAccepted: data.get("highRiskOverrideAccepted") === "yes",
+    highRiskCategories: data.getAll("highRiskCategories"),
     capabilities: data.getAll("capabilities")
   };
 }
 
 function saveDraft() {
-  try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ input: collectInput(), highestStep })); } catch { /* Browser storage can be disabled. */ }
+  try {
+    const input = collectInput();
+    input.dataUseAuthorized = false;
+    input.quarterlyPlanningAuthorized = false;
+    input.trainingUseAuthorized = false;
+    input.confidentialInfoIncluded = false;
+    input.confidentialInfoAuthorized = false;
+    input.highRiskOverrideAccepted = false;
+    input.highRiskCategories = [];
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ input, highestStep }));
+  } catch { /* Browser storage can be disabled. */ }
 }
 
 function applyDraft(input) {
   Object.entries(input || {}).forEach(([name, value]) => {
-    if (name === "capabilities" && Array.isArray(value)) {
-      document.querySelectorAll('[name="capabilities"]').forEach((element) => { element.checked = value.includes(element.value); });
+    if (["capabilities", "highRiskCategories"].includes(name) && Array.isArray(value)) {
+      document.querySelectorAll(`[name="${name}"]`).forEach((element) => { element.checked = value.includes(element.value); });
       return;
     }
     const candidates = [...form.querySelectorAll(`[name="${CSS.escape(name)}"]`)];
@@ -87,6 +109,8 @@ function applyDraft(input) {
     if (candidates[0].type === "radio") {
       const target = candidates.find((candidate) => candidate.value === String(value));
       if (target) target.checked = true;
+    } else if (candidates[0].type === "checkbox") {
+      candidates[0].checked = value === true;
     } else {
       candidates[0].value = value ?? "";
     }
@@ -127,7 +151,7 @@ function validateStep(step) {
   const input = collectInput();
   const errors = {};
   if (step === 1) {
-    if (!(input.budget > 0)) errors.budget = "Enter a project budget greater than zero.";
+    if (input.budgetDisclosure !== "none" && !(input.budget > 0)) errors.budget = "Enter the approximate or exact budget, or select no budget information.";
     if (input.objectives.trim().length < 20) errors.objectives = "Describe the objective in at least 20 characters.";
   }
   if (step === 2) {
@@ -136,6 +160,12 @@ function validateStep(step) {
     if (!input.teamGoals.trim()) errors.teamGoals = "Add at least one team or team-member goal.";
   }
   if (step === 4 && input.teamSize < 1) errors.teamSize = "Team size must be at least one.";
+  if (step === 5) {
+    if (!input.dataUseAuthorized) errors.dataUseAuthorized = "Confirm that you are authorized to share the information and permit its use only for the stated company-planning purposes.";
+    if (input.confidentialInfoIncluded && input.highRiskCategories.length === 0) errors.highRiskCategories = "Select every high-risk information category included in the submission.";
+    if (input.confidentialInfoIncluded && !input.confidentialInfoAuthorized) errors.confidentialInfoAuthorized = "Confirm that you are authorized to disclose and process the selected high-risk categories.";
+    if (input.confidentialInfoIncluded && !input.highRiskOverrideAccepted) errors.highRiskOverrideAccepted = "Review and accept the informed-risk override, or remove the high-risk information.";
+  }
   showErrors(errors);
   const firstField = Object.keys(errors)[0] ? form.querySelector(`[name="${CSS.escape(Object.keys(errors)[0])}"]`) : null;
   if (firstField) firstField.focus();
@@ -146,6 +176,7 @@ function stepForError(name) {
   if (["budget", "deadline", "objectives"].includes(name)) return 1;
   if (["companyGoals", "departmentGoals", "teamGoals"].includes(name)) return 2;
   if (["constraints", "scopeCertainty", "changeFrequency", "compliance"].includes(name)) return 3;
+  if (["dataUseAuthorized", "highRiskCategories", "confidentialInfoAuthorized", "highRiskOverrideAccepted"].includes(name)) return 5;
   return 4;
 }
 
@@ -174,6 +205,44 @@ function updateStep(step, options = {}) {
   if (options.scroll !== false) advisor.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+function syncBudgetDisclosure() {
+  const noBudget = byId("budget-disclosure").value === "none";
+  byId("budget").disabled = noBudget;
+  byId("currency").disabled = noBudget;
+  byId("budget-period").disabled = noBudget;
+  byId("budget-amount-field").classList.toggle("is-disabled", noBudget);
+}
+
+function resetHighRiskOverride() {
+  byId("high-risk-override-accepted").value = "no";
+  byId("override-status").textContent = "Not accepted";
+  byId("override-status").classList.remove("is-accepted");
+}
+
+function syncHighRiskPanel() {
+  const included = byId("confidential-info-included").checked;
+  byId("high-risk-panel").hidden = !included;
+  if (!included) {
+    document.querySelectorAll('[name="highRiskCategories"]').forEach((field) => { field.checked = false; });
+    byId("confidential-info-authorized").checked = false;
+    resetHighRiskOverride();
+  }
+}
+
+byId("budget-disclosure").addEventListener("change", syncBudgetDisclosure);
+byId("confidential-info-included").addEventListener("change", syncHighRiskPanel);
+["quarterly-planning-authorized", "training-use-authorized", "confidential-info-authorized"].forEach((id) => byId(id).addEventListener("change", () => {
+  if (byId("confidential-info-included").checked) resetHighRiskOverride();
+}));
+document.querySelectorAll('[name="highRiskCategories"]').forEach((field) => field.addEventListener("change", resetHighRiskOverride));
+byId("review-high-risk-override").addEventListener("click", () => byId("high-risk-dialog").showModal());
+byId("accept-high-risk-override").addEventListener("click", () => {
+  byId("high-risk-override-accepted").value = "yes";
+  byId("override-status").textContent = "Accepted · company-data-authorization-2026-09-21-v1";
+  byId("override-status").classList.add("is-accepted");
+  document.querySelector('[data-error-for="highRiskOverrideAccepted"]').textContent = "";
+});
+
 stepItems.forEach((item) => item.querySelector("button").addEventListener("click", () => {
   const target = Number(item.dataset.step);
   if (target <= highestStep) updateStep(target);
@@ -200,11 +269,12 @@ function reviewCard(index, title, rows) {
 
 function renderReview() {
   const input = collectInput();
+  const budgetSummary = input.budgetDisclosure === "none" ? "Not provided" : `${input.budgetDisclosure === "exact" ? "Exact" : "Approx."} ${formatMoney(input.budget, input.currency)} / ${input.budgetPeriod}`;
   byId("review-grid").innerHTML = [
-    reviewCard(1, "Project basics", [["Project", input.projectName || "Unnamed project"], ["Budget", formatMoney(input.budget, input.currency)], ["Timeline", input.deadline || labelize(input.window)], ["Objective", summarize(input.objectives)]]),
+    reviewCard(1, "Project basics", [["Project", input.projectName || "Unnamed project"], ["Budget", budgetSummary], ["Timeline", input.deadline || labelize(input.window)], ["Objective", summarize(input.objectives)]]),
     reviewCard(2, "Goals & structure", [["Hierarchy", labelize(input.hierarchy)], ["Company", summarize(input.companyGoals)], ["Department", summarize(input.departmentGoals)], ["Team", summarize(input.teamGoals)]]),
     reviewCard(3, "Delivery realities", [["Scope certainty", labelize(input.scopeCertainty)], ["Expected change", labelize(input.changeFrequency)], ["Compliance", labelize(input.compliance)], ["Cadence", labelize(input.deliveryCadence)]]),
-    reviewCard(4, "Team & capability", [["Core team", `${input.teamSize} people`], ["Working model", labelize(input.distribution)], ["Dependencies", labelize(input.dependencyLevel)], ["Capabilities", input.capabilities.length ? input.capabilities.map(labelize).join(", ") : "None selected"]])
+    reviewCard(4, "Team & capability", [["Employees", input.totalEmployees || "Not provided"], ["Relevant team", `${input.teamSize} people`], ["Available", input.availablePersonnel || "Not provided"], ["Hiring", summarize(input.hiringConstraints)], ["Working model", labelize(input.distribution)], ["Capabilities", input.capabilities.length ? input.capabilities.map(labelize).join(", ") : "None selected"]])
   ].join("");
 }
 
@@ -227,8 +297,15 @@ function validSourceUrl(value) {
 function renderResults(data) {
   latestResult = data;
   const recommendation = data.recommendation;
+  const organizationAnalysis = data.organizationAnalysis;
   byId("results-project-name").textContent = data.project.name;
   byId("result-notice").textContent = data.notice;
+  byId("materiality-question").textContent = organizationAnalysis.question;
+  byId("materiality-answer").textContent = organizationAnalysis.answer;
+  byId("analysis-objective").textContent = organizationAnalysis.objective;
+  const insightCards = (items) => items.map((item) => `<article><strong>${esc(item.signal)}</strong><dl><div><dt>Evidence</dt><dd>${esc(item.evidence)}</dd></div><div><dt>Objective impact</dt><dd>${esc(item.objectiveImpact)}</dd></div></dl></article>`).join("");
+  byId("opportunity-list").innerHTML = insightCards(organizationAnalysis.opportunities);
+  byId("problem-list").innerHTML = insightCards(organizationAnalysis.problems);
   byId("analysis-mode").textContent = data.mode === "ai-assisted" ? "AI-assisted explanation" : "Transparent model";
   byId("recommendation-label").textContent = recommendation.label;
   byId("recommendation-name").textContent = recommendation.name;
@@ -238,6 +315,11 @@ function renderResults(data) {
   byId("confidence-label").textContent = recommendation.confidence.label;
   byId("confidence-basis").textContent = recommendation.confidence.basis;
   byId("method-mix").innerHTML = recommendation.methodMix.map((part) => `<div class="mix-segment"><div><span style="width:${Number(part.percent)}%"></span></div><small>${esc(part.name)} · ${Number(part.percent)}%</small></div>`).join("");
+  const traceFields = [
+    ["Evidence", "evidence"], ["Interpretation", "interpretation"], ["Recommendation", "recommendation"],
+    ["Action", "action"], ["Owner", "owner"], ["Dependency", "dependency"], ["Success criterion", "successCriterion"]
+  ];
+  byId("recommendation-traces").innerHTML = data.traceableRecommendations.map((item, index) => `<article class="trace-card"><header><span>${String(index + 1).padStart(2, "0")}</span><p>${esc(item.objectiveImpact)}</p></header><dl>${traceFields.map(([label, key]) => `<div><dt>${label}</dt><dd>${esc(item[key])}</dd></div>`).join("")}</dl></article>`).join("");
 
   const perspective = data.perspective;
   byId("ai-perspective").hidden = !perspective;
@@ -254,11 +336,14 @@ function renderResults(data) {
   appendList("strength-list", recommendation.tradeoffs.strengths);
   appendList("watchout-list", recommendation.tradeoffs.watchouts);
   byId("blueprint-cadence").textContent = recommendation.blueprint.cadence;
+  byId("launch-sequence").innerHTML = data.executionPlan.launchSequence.map((phase) => `<article><span>${esc(phase.window)}</span><p>${esc(phase.outcome)}</p><small>${esc(phase.owner)}</small></article>`).join("");
   appendList("blueprint-roles", recommendation.blueprint.roles);
   appendList("blueprint-practices", recommendation.blueprint.practices);
   appendList("blueprint-controls", recommendation.blueprint.controls);
   appendList("tailoring-list", recommendation.tailoring);
   byId("tailoring-row").hidden = recommendation.tailoring.length === 0;
+  byId("quarterly-section").hidden = !data.quarterlyPlan;
+  if (data.quarterlyPlan) byId("quarterly-grid").innerHTML = data.quarterlyPlan.cycles.map((cycle) => `<article><span>${esc(cycle.window)}</span><h4>${esc(cycle.focus)}</h4><p><strong>Decision:</strong> ${esc(cycle.decision)}</p></article>`).join("");
   byId("alternative-grid").innerHTML = data.alternatives.map((alternative) => `<article class="alternative-card"><div class="alternative-card-head"><div><h4>${esc(alternative.name)}</h4><span class="alt-label">${esc(alternative.label)}</span></div><span class="alt-score">${Number(alternative.score)}</span></div><p>${esc(alternative.description)}</p><div class="alt-detail"><strong>Choose instead when</strong>${esc(alternative.whenToChooseInstead)}<strong>Tradeoff</strong>${esc(alternative.tradeoff)}</div><a href="${esc(validSourceUrl(alternative.source.url))}" target="_blank" rel="noreferrer">Read ${esc(alternative.source.publisher)} guidance ↗</a></article>`).join("");
   appendList("assumptions-list", data.assumptions);
 
@@ -269,7 +354,7 @@ function renderResults(data) {
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!validateStep(1) || !validateStep(2) || !validateStep(4)) {
+  if (!validateStep(1) || !validateStep(2) || !validateStep(4) || !validateStep(5)) {
     const errorField = form.querySelector("[aria-invalid='true']");
     const errorStep = Number(errorField?.closest(".form-step")?.dataset.step || 1);
     updateStep(errorStep);
@@ -279,9 +364,17 @@ form.addEventListener("submit", async (event) => {
   generateButton.disabled = true;
   generateButton.classList.add("is-loading");
   try {
+    const tokenResponse = await fetch("/api/request-token", { headers: { accept: "application/json" } });
+    const tokenPayload = await tokenResponse.json();
+    if (!tokenResponse.ok || !tokenPayload.token) throw new Error(tokenPayload.error || "A secure request token could not be created.");
     const response = await fetch("/api/recommend", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        "x-request-token": tokenPayload.token,
+        "x-request-timestamp": String(Date.now()),
+        "x-idempotency-key": crypto.randomUUID()
+      },
       body: JSON.stringify(collectInput())
     });
     const data = await response.json();
@@ -333,6 +426,8 @@ byId("clear-button").addEventListener("click", () => {
   localStorage.removeItem(DRAFT_KEY);
   form.reset();
   byId("team-size").value = 6;
+  syncBudgetDisclosure();
+  syncHighRiskPanel();
   highestStep = 1;
   updateCharacterCounts();
   updateStep(1);
@@ -343,5 +438,7 @@ const today = new Date();
 const localToday = new Date(today.getTime() - today.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 byId("deadline").min = localToday;
 loadDraft();
+syncBudgetDisclosure();
+syncHighRiskPanel();
 updateCharacterCounts();
 updateStep(1, { scroll: false });

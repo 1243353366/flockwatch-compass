@@ -8,6 +8,8 @@ const HIERARCHY = Object.freeze({ flat: 0.18, functional: 0.52, matrix: 0.78, hi
 const CADENCE = Object.freeze({ "one-time": 0.12, milestones: 0.5, biweekly: 0.78, continuous: 1 });
 const BUDGET_PRESSURE = Object.freeze({ flexible: 0.2, fixed: 0.62, tight: 0.95 });
 const PREFERENCE = Object.freeze({ none: null, agile: "scrum", structured: "predictive", flow: "kanban", hybrid: "hybrid" });
+export const CONSENT_VERSION = "company-data-authorization-2026-09-21-v1";
+const HIGH_RISK_CATEGORIES = Object.freeze(["confidential", "proprietary", "trade-secret", "personal", "regulated", "other-sensitive"]);
 
 export const METHODOLOGIES = Object.freeze([
   {
@@ -145,6 +147,8 @@ export function normalizeInput(raw = {}) {
     projectName: text(raw.projectName, 120),
     budget: number(raw.budget, 0, 1_000_000_000_000, 0),
     currency: choice(raw.currency, ["USD", "EUR", "GBP", "CAD", "AUD", "JPY", "INR", "OTHER"], "USD"),
+    budgetDisclosure: choice(raw.budgetDisclosure, ["none", "approximate", "exact"], "approximate"),
+    budgetPeriod: choice(raw.budgetPeriod, ["monthly", "quarterly", "annual", "project"], "project"),
     budgetFlexibility: choice(raw.budgetFlexibility, ["tight", "fixed", "flexible"], "fixed"),
     deadline: /^\d{4}-\d{2}-\d{2}$/.test(deadline) ? deadline : "",
     window: choice(raw.window, ["under-6-weeks", "6-12-weeks", "3-6-months", "6-12-months", "over-year"], "3-6-months"),
@@ -162,11 +166,23 @@ export function normalizeInput(raw = {}) {
     deliveryCadence: choice(raw.deliveryCadence, ["one-time", "milestones", "biweekly", "continuous"], "milestones"),
     compliance: choice(raw.compliance, ["low", "medium", "high"], "medium"),
     teamSize: number(raw.teamSize, 1, 500, 6),
+    totalEmployees: number(raw.totalEmployees, 0, 10_000_000, 0),
+    availablePersonnel: number(raw.availablePersonnel, 0, 500, 0),
+    hiringConstraints: text(raw.hiringConstraints, 2000),
     distribution: choice(raw.distribution, ["colocated", "hybrid", "distributed"], "hybrid"),
     stakeholderAccess: choice(raw.stakeholderAccess, ["low", "medium", "high"], "medium"),
     dependencyLevel: choice(raw.dependencyLevel, ["low", "medium", "high"], "medium"),
     interruptionLevel: choice(raw.interruptionLevel, ["low", "medium", "high"], "medium"),
     preference: choice(raw.preference, ["none", "agile", "structured", "flow", "hybrid"], "none"),
+    dataUseAuthorized: raw.dataUseAuthorized === true,
+    quarterlyPlanningAuthorized: raw.quarterlyPlanningAuthorized === true,
+    trainingUseAuthorized: raw.trainingUseAuthorized === true,
+    confidentialInfoIncluded: raw.confidentialInfoIncluded === true,
+    confidentialInfoAuthorized: raw.confidentialInfoAuthorized === true,
+    highRiskOverrideAccepted: raw.highRiskOverrideAccepted === true,
+    highRiskCategories: Array.isArray(raw.highRiskCategories)
+      ? [...new Set(raw.highRiskCategories.filter((item) => HIGH_RISK_CATEGORIES.includes(item)))].slice(0, HIGH_RISK_CATEGORIES.length)
+      : [],
     capabilities: Array.isArray(raw.capabilities)
       ? [...new Set(raw.capabilities.filter((item) => ["cross-functional", "dedicated", "agile-experience", "discovery", "estimation", "specialists"].includes(item)))].slice(0, 6)
       : []
@@ -175,13 +191,17 @@ export function normalizeInput(raw = {}) {
 
 export function validateInput(input) {
   const errors = {};
-  if (!(input.budget > 0)) errors.budget = "Enter a project budget greater than zero.";
+  if (input.budgetDisclosure !== "none" && !(input.budget > 0)) errors.budget = "Enter the approximate or exact budget, or select no budget information.";
   if (!input.deadline && !input.window) errors.deadline = "Choose a desired completion window or enter a deadline.";
   if (input.objectives.length < 20) errors.objectives = "Describe the project objective in at least 20 characters.";
   if (!input.companyGoals) errors.companyGoals = "Add at least one company-level goal.";
   if (!input.departmentGoals) errors.departmentGoals = "Add at least one department or team goal.";
   if (!input.teamGoals) errors.teamGoals = "Add at least one team-member or team goal.";
   if (input.teamSize < 1) errors.teamSize = "Team size must be at least one.";
+  if (!input.dataUseAuthorized) errors.dataUseAuthorized = "Explicit company-data authorization is required before Project Compass can generate a recommendation or framework.";
+  if (input.confidentialInfoIncluded && !input.confidentialInfoAuthorized) errors.confidentialInfoAuthorized = "Confirm that you are authorized to disclose and process the identified confidential or trade-secret information.";
+  if (input.confidentialInfoIncluded && input.highRiskCategories.length === 0) errors.highRiskCategories = "Select every high-risk information category included in the submission.";
+  if (input.confidentialInfoIncluded && !input.highRiskOverrideAccepted) errors.highRiskOverrideAccepted = "Review and accept the informed-risk override, or remove the high-risk information before submitting.";
   return errors;
 }
 
@@ -208,6 +228,7 @@ function deriveFactors(input) {
   const deadlineFromDate = days === null ? urgent : days <= 42 ? 1 : days <= 90 ? 0.82 : days <= 180 ? 0.62 : 0.38;
   const deadline = Math.max(urgent, deadlineFromDate);
   const teamCapabilities = input.capabilities;
+  const effectivePersonnel = input.availablePersonnel || input.teamSize;
   const autonomy = clamp(mean(
     teamCapabilities.includes("cross-functional") ? 0.92 : 0.35,
     teamCapabilities.includes("dedicated") ? 0.92 : 0.42,
@@ -223,7 +244,7 @@ function deriveFactors(input) {
     iteration: clamp(mean(cadence, change, stakeholder)),
     autonomy,
     deadline,
-    resource: clamp(mean(budget, dependencies, input.teamSize <= 8 ? 0.72 : 0.48)),
+    resource: clamp(mean(budget, dependencies, effectivePersonnel <= 8 ? 0.72 : 0.48)),
     discovery,
     dependencies
   };
@@ -325,6 +346,201 @@ function buildRationale(primary, input, factors) {
   return rationale;
 }
 
+function buildOrganizationAnalysis(input, factors) {
+  const opportunities = [];
+  const problems = [];
+
+  if (factors.iteration >= 0.62) opportunities.push({
+    signal: "Fast learning loop",
+    evidence: `Stakeholder access is ${input.stakeholderAccess}, expected change is ${input.changeFrequency}, and the desired cadence is ${input.deliveryCadence}.`,
+    objectiveImpact: "Frequent evidence can correct assumptions before they consume a material share of the budget or delay the stated objective."
+  });
+  if (factors.autonomy >= 0.58) opportunities.push({
+    signal: "Decision-making closer to the work",
+    evidence: `The ${input.teamSize}-person team reports ${input.capabilities.length || 0} relevant capabilities and operates in a ${input.hierarchy} structure.`,
+    objectiveImpact: "Clear delegated authority can shorten decision time and protect delivery capacity for the stated objective."
+  });
+  if (factors.flow >= 0.55) opportunities.push({
+    signal: "Lower coordination waste",
+    evidence: `The project expects ${input.interruptionLevel} unplanned work and a ${input.deliveryCadence} delivery cadence.`,
+    objectiveImpact: "Explicit work-in-progress limits can reduce context switching and move more effort toward the stated objective."
+  });
+  if (opportunities.length < 2) opportunities.push({
+    signal: "Explicit objective alignment",
+    evidence: `Company, department, and team goals were supplied alongside the project objective: ${input.objectives.slice(0, 180)}.`,
+    objectiveImpact: "A shared objective hierarchy makes it possible to reject work that does not materially advance the intended outcome."
+  });
+
+  if (factors.dependencies >= 0.62) problems.push({
+    signal: "Dependency-driven delay risk",
+    evidence: `Dependency load is ${input.dependencyLevel}; the operating structure is ${input.hierarchy}.`,
+    objectiveImpact: "Unowned cross-team or vendor dependencies can delay the stated objective even when the core team completes its own work."
+  });
+  if (factors.governance >= 0.62) problems.push({
+    signal: "Approval latency",
+    evidence: `Approval load is ${input.approvalLoad}, compliance is ${input.compliance}, and hierarchy is ${input.hierarchy}.`,
+    objectiveImpact: "Slow or ambiguous decision rights can turn routine changes into schedule and budget risk against the stated objective."
+  });
+  if (factors.discovery >= 0.62) problems.push({
+    signal: "Unresolved solution assumptions",
+    evidence: `Scope certainty is ${input.scopeCertainty} and expected change is ${input.changeFrequency}.`,
+    objectiveImpact: "Committing too early to an untested solution can produce rework or an output that fails to achieve the stated objective."
+  });
+  if (factors.deadline >= 0.72) problems.push({
+    signal: "Schedule compression",
+    evidence: `Deadline posture is ${input.urgency}; the completion target is ${input.deadline || input.window}.`,
+    objectiveImpact: "The available decision and delivery time may be smaller than the coordination and dependency load requires."
+  });
+  if (problems.length < 2) problems.push({
+    signal: "Execution assumptions need validation",
+    evidence: `The project combines a ${input.budgetFlexibility} budget, ${input.scopeCertainty} scope certainty, and ${input.dependencyLevel} dependencies.`,
+    objectiveImpact: "Unverified capacity and sequencing assumptions can weaken the link between the project plan and the stated objective."
+  });
+
+  return {
+    question: "Does this information materially affect the organization's stated objective?",
+    answer: "Yes. The conditions below change the probability, cost, speed, or effort required to achieve the stated objective.",
+    objective: input.objectives,
+    opportunities: opportunities.slice(0, 3),
+    problems: problems.slice(0, 3)
+  };
+}
+
+function recommendationForSignal(signal, primary, input) {
+  const definitions = {
+    adaptability: {
+      evidence: `Scope certainty is ${input.scopeCertainty} and expected change is ${input.changeFrequency}.`,
+      interpretation: "A fully detailed early plan would harden assumptions before the organization has enough evidence.",
+      recommendation: `Use ${primary.name} to hold the outcome boundary steady while adapting solution scope through evidence.`,
+      action: "Create an assumption backlog, rank the three assumptions most likely to prevent the objective, and test them before expanding delivery.",
+      owner: "Product owner",
+      dependency: "Access to representative stakeholders and decision-makers",
+      successCriterion: "The top three assumptions are tested and resulting scope decisions are recorded before more than 20% of the budget is committed."
+    },
+    planning: {
+      evidence: `Deadline posture is ${input.urgency}, dependencies are ${input.dependencyLevel}, and scope certainty is ${input.scopeCertainty}.`,
+      interpretation: "The objective depends on credible sequencing and forecasting, not only team-level task execution.",
+      recommendation: `Use the planning controls in ${primary.name} to maintain one integrated milestone and dependency forecast.`,
+      action: "Build a rolling six-week plan that names each milestone, dependency, owner, decision date, and forecast risk.",
+      owner: "Project manager",
+      dependency: "Workstream estimates and external commitment dates",
+      successCriterion: "Every critical milestone has an owner and dependency date, and forecast variance is reviewed weekly."
+    },
+    governance: {
+      evidence: `Approval load is ${input.approvalLoad}, compliance is ${input.compliance}, and the organization is ${input.hierarchy}.`,
+      interpretation: "The stated objective can be delayed by unclear decision rights even when delivery work is progressing.",
+      recommendation: `Pair ${primary.name} with explicit decision thresholds and lightweight evidence gates.`,
+      action: "Publish a decision-rights matrix that defines team authority, sponsor authority, approval evidence, and maximum response time.",
+      owner: "Executive sponsor",
+      dependency: "Agreement from compliance, finance, and functional leaders",
+      successCriterion: "At least 90% of project decisions are resolved within the agreed response time and no item waits more than five business days for approval."
+    },
+    flow: {
+      evidence: `Unplanned work is ${input.interruptionLevel} and the requested cadence is ${input.deliveryCadence}.`,
+      interpretation: "Starting too much work would divert human effort from the objective and lengthen delivery time.",
+      recommendation: `Apply ${primary.name} with visible work-in-progress limits and an explicit expedite policy.`,
+      action: "Map the delivery workflow, set a capacity limit for each active stage, and define which urgent requests may bypass the normal queue.",
+      owner: "Delivery lead",
+      dependency: "Team agreement on workflow states and capacity",
+      successCriterion: "Work-in-progress limits are respected for four consecutive weeks and median cycle time improves from the first-cycle baseline."
+    },
+    iteration: {
+      evidence: `Expected change is ${input.changeFrequency}, stakeholder access is ${input.stakeholderAccess}, and cadence is ${input.deliveryCadence}.`,
+      interpretation: "The organization can use frequent stakeholder evidence to keep delivery tied to the objective.",
+      recommendation: `Use ${primary.name} to produce and review a usable outcome in each delivery cycle.`,
+      action: "Define the first reviewable outcome, schedule the stakeholder review now, and record every resulting continue, change, or stop decision.",
+      owner: "Product owner",
+      dependency: "Named stakeholders with protected review time",
+      successCriterion: "A usable outcome is reviewed in every cycle and resulting decisions are recorded within two business days."
+    },
+    autonomy: {
+      evidence: `The team has ${input.capabilities.length || 0} selected capabilities and works in a ${input.hierarchy} organization.`,
+      interpretation: "The team can move faster if solution decisions are delegated within explicit boundaries.",
+      recommendation: `Implement ${primary.name} with an empowered cross-functional team and named escalation boundaries.`,
+      action: "Document which scope, design, and sequencing decisions the team can make without escalation, then staff any missing capability.",
+      owner: "Functional leaders",
+      dependency: "Stable team allocation and sponsor delegation",
+      successCriterion: "At least 90% of day-to-day delivery decisions are resolved within the team boundary during the first two cycles."
+    },
+    deadline: {
+      evidence: `Deadline posture is ${input.urgency} and the target is ${input.deadline || input.window}.`,
+      interpretation: "The objective requires early visibility into the few milestones and decisions that can move the finish date.",
+      recommendation: `Use ${primary.name} with explicit milestone buffers and early escalation of critical-path changes.`,
+      action: "Identify the critical milestones, assign a forecast buffer, and review blocker age and buffer consumption each week.",
+      owner: "Project manager",
+      dependency: "Credible milestone estimates and dependency commitments",
+      successCriterion: "No unresolved critical blocker is older than five business days and every milestone forecast includes current buffer status."
+    },
+    resource: {
+      evidence: `Budget disclosure is ${input.budgetDisclosure}, budget flexibility is ${input.budgetFlexibility}, and ${input.availablePersonnel || input.teamSize} people are identified as available.`,
+      interpretation: "Parallel work and context switching can consume scarce budget and specialist capacity without advancing the objective.",
+      recommendation: `Use ${primary.name} to cap concurrent work and protect the people whose capacity constrains delivery.`,
+      action: "Set a portfolio-level concurrency limit, reserve specialist capacity, and stop or defer work that does not materially advance the objective.",
+      owner: "Project manager and resource managers",
+      dependency: "Visible allocation data and authority to defer competing work",
+      successCriterion: "Concurrent work stays within the agreed capacity limit and no critical role is allocated above its committed availability."
+    },
+    discovery: {
+      evidence: `Scope certainty is ${input.scopeCertainty}; discovery capability is ${input.capabilities.includes("discovery") ? "available" : "not selected"}.`,
+      interpretation: "The objective depends on learning which solution is valuable and feasible before scaling execution.",
+      recommendation: `Begin ${primary.name} with a bounded discovery cycle tied directly to the stated objective.`,
+      action: "Define the highest-risk user, process, and technical assumptions and run the smallest tests that can change the delivery decision.",
+      owner: "Product owner and discovery lead",
+      dependency: "User access, representative data, and technical prototyping support",
+      successCriterion: "Each high-risk assumption has evidence and a continue, change, or stop decision before full implementation begins."
+    },
+    dependencies: {
+      evidence: `Dependency load is ${input.dependencyLevel} in a ${input.hierarchy} organization.`,
+      interpretation: "The objective can be missed through cross-team waiting even if each workstream reports local progress.",
+      recommendation: `Operate ${primary.name} with one cross-team dependency map and joint integration checkpoints.`,
+      action: "List every critical dependency, name both sides of the handoff, set a needed-by date, and review unresolved dependencies weekly.",
+      owner: "Project manager and workstream leads",
+      dependency: "Participation from external teams and vendors",
+      successCriterion: "Every critical dependency has an owner and needed-by date, with zero newly discovered critical dependencies at milestone review."
+    }
+  };
+  const detail = definitions[signal.key] || definitions.dependencies;
+  return {
+    objectiveImpact: `Material: ${signal.label} directly affects the probability, cost, speed, or effort required to achieve the stated objective.`,
+    ...detail
+  };
+}
+
+function buildTraceableRecommendations(primary, input, factors) {
+  return topSignals(factors).slice(0, 3).map((signal, index) => ({
+    id: `recommendation-${index + 1}`,
+    ...recommendationForSignal(signal, primary, input)
+  }));
+}
+
+function buildExecutionPlan(primary, input) {
+  return {
+    objective: input.objectives,
+    framework: primary.name,
+    cadence: primary.blueprint.cadence,
+    launchSequence: [
+      { window: "Days 1–5", outcome: "Confirm the objective, success measures, decision rights, and non-negotiable boundaries.", owner: "Executive sponsor and project manager" },
+      { window: "Days 6–10", outcome: "Map workstreams, dependencies, risks, available capacity, and the first reviewable outcome.", owner: "Project manager and workstream leads" },
+      { window: "Days 11–20", outcome: `Launch the first ${primary.name} delivery cycle and collect evidence against the stated objective.`, owner: "Delivery team" },
+      { window: "Days 21–30", outcome: "Review evidence, resolve contradictions, adapt the plan, and approve the next bounded commitment.", owner: "Product owner and sponsor" }
+    ]
+  };
+}
+
+function buildQuarterlyPlan(primary, input) {
+  if (!input.quarterlyPlanningAuthorized) return null;
+  return {
+    authorized: true,
+    horizon: "90 days",
+    purpose: "Quarterly planning and planning-cycle recommendations",
+    cycles: [
+      { window: "Days 1–30", focus: "Validate the objective, establish the operating model, resolve the highest-risk assumptions, and baseline delivery evidence.", decision: "Continue, reshape, or stop the initial approach." },
+      { window: "Days 31–60", focus: `Scale the strongest evidence-backed work through ${primary.name} while controlling dependencies and work in progress.`, decision: "Reallocate capacity toward the work with the clearest objective impact." },
+      { window: "Days 61–90", focus: "Complete the quarter's bounded outcome, measure objective movement, and prepare the next planning-cycle recommendation.", decision: "Fund, adapt, defer, or end the next-quarter work based on evidence." }
+    ]
+  };
+}
+
 function buildTradeoffs(primary, input) {
   const strengths = [...primary.advantages];
   const watchouts = [...primary.cautions];
@@ -360,7 +576,7 @@ function buildTailoring(primary, input) {
 
 function confidenceFor(input, ranking) {
   const completenessChecks = [
-    input.budget > 0, Boolean(input.deadline || input.window), input.objectives.length >= 20,
+    input.budgetDisclosure === "none" || input.budget > 0, Boolean(input.deadline || input.window), input.objectives.length >= 20,
     Boolean(input.companyGoals), Boolean(input.departmentGoals), Boolean(input.teamGoals),
     Boolean(input.constraints), input.capabilities.length >= 2, Boolean(input.nonNegotiables)
   ];
@@ -402,18 +618,56 @@ export function recommendProject(rawInput) {
   const runnerUp = scored[1].method;
   const confidence = confidenceFor(input, scored);
   const projectLabel = input.projectName || "this project";
+  const generatedAt = new Date().toISOString();
+  const organizationAnalysis = buildOrganizationAnalysis(input, factors);
+  const traceableRecommendations = buildTraceableRecommendations(primary, input, factors);
+  const executionPlan = buildExecutionPlan(primary, input);
+  const quarterlyPlan = buildQuarterlyPlan(primary, input);
 
   return {
-    version: "project-compass-v1",
-    generatedAt: new Date().toISOString(),
+    version: "project-compass-v2",
+    generatedAt,
     notice: "This is a decision-support recommendation based on the information supplied. It is not an objective truth, guarantee, or substitute for project leadership judgment.",
+    authorization: {
+      consentVersion: CONSENT_VERSION,
+      grantedAt: generatedAt,
+      selectedPurposes: [
+        "recommendations-plans-delivery-frameworks",
+        ...(input.quarterlyPlanningAuthorized ? ["quarterly-planning"] : []),
+        ...(input.trainingUseAuthorized ? ["training-requested-but-disabled"] : [])
+      ],
+      requiredCompanyUse: {
+        granted: true,
+        scope: "Use the supplied company and project information only to develop recommendations, plans, and delivery frameworks for the company."
+      },
+      quarterlyPlanning: {
+        granted: input.quarterlyPlanningAuthorized,
+        scope: "Quarterly planning and planning-cycle recommendations."
+      },
+      training: {
+        requested: input.trainingUseAuthorized,
+        enabled: false,
+        status: input.trainingUseAuthorized ? "Consent recorded, but training use is disabled because retention and deletion controls are not configured." : "Not authorized."
+      },
+      confidentialInformation: {
+        declared: input.confidentialInfoIncluded,
+        authorized: input.confidentialInfoIncluded ? input.confidentialInfoAuthorized : false,
+        categories: input.confidentialInfoIncluded ? input.highRiskCategories : [],
+        informedRiskOverrideAccepted: input.confidentialInfoIncluded ? input.highRiskOverrideAccepted : false,
+        disclaimer: "The override records informed choice and does not waive liability, change legal classification, or displace applicable law or organizational obligations."
+      },
+      purposeLimitation: "These grants do not permit unrelated uses, disclosure, or secondary processing beyond the selected purposes and apply only to information the submitter is permitted to provide."
+    },
     project: {
       name: projectLabel,
-      budget: { amount: input.budget, currency: input.currency, flexibility: input.budgetFlexibility },
+      budget: { disclosure: input.budgetDisclosure, amount: input.budgetDisclosure === "none" ? null : input.budget, currency: input.currency, period: input.budgetPeriod, flexibility: input.budgetFlexibility },
       deadline: input.deadline || null,
       completionWindow: input.window,
-      teamSize: input.teamSize
+      teamSize: input.teamSize,
+      workforce: { totalEmployees: input.totalEmployees || null, availablePersonnel: input.availablePersonnel || null, hiringConstraints: input.hiringConstraints || null }
     },
+    organizationAnalysis,
+    traceableRecommendations,
     recommendation: {
       methodId: primary.id,
       name: primary.name,
@@ -429,6 +683,8 @@ export function recommendProject(rawInput) {
       blueprint: primary.blueprint,
       source: primary.source
     },
+    executionPlan,
+    quarterlyPlan,
     alternatives: scored.slice(1, 4).map(({ method, score }) => ({
       id: method.id,
       name: method.name,

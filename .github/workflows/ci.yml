@@ -1,4 +1,4 @@
-name: Verify self-hosted app
+name: Verify Project Compass
 
 on:
   push:
