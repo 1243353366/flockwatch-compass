@@ -10,6 +10,12 @@ The Render web service is the only public component. It serves static assets, pe
 
 A free Render Key Value instance named `project-compass-queue` has been provisioned with persistence disabled and no public IP allow list. A dedicated Render Background Worker configuration is staged in `render-worker.yaml`, but it is not activated because Render has no free background-worker plan. Activating it would create paid compute and requires the user's payment configuration and explicit action.
 
+## Governance ownership
+
+The authorization policy is owned by **Application owner (1243353366)** unless the operator explicitly configures a different `AUTHORIZATION_POLICY_OWNER`. Every accepted request records an authorized submitter name, work email, allow-listed authority role, consent version, and timestamp. Every decision brief also names the human accountable for validating the information, interpreting the recommendation, and deciding whether to act, including when the optional AI narrative layer is enabled.
+
+The high-risk override additionally requires a named approver with an executive-sponsor, company-data-owner, or security/privacy authority role. The server rejects a checkbox-only submission when the role record is missing or invalid. Training and retention are not available capabilities and cannot be authorized through this release.
+
 ## Request defenses
 
 | Threat | Current control | Residual / next control |

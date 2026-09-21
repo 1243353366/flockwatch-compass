@@ -16,7 +16,7 @@ Project Compass collects a structured decision brief across five steps:
 2. **Goals and structure:** company goals, department goals, team goals, organizational hierarchy, approval load, and non-negotiable outcomes.
 3. **Delivery realities:** scope certainty, expected change, desired cadence, compliance burden, and known constraints.
 4. **Team and capabilities:** total employees, relevant team size, available personnel, hiring constraints, distribution, stakeholder access, dependency load, interruptions, skills, and optional preferences.
-5. **Review and authorization:** a human-readable summary, required company-use authorization, separate quarterly and training scopes, and a conditional high-risk information override.
+5. **Review and authorization:** a human-readable summary, named submitter with an allowed authority role, named accountable decision owner, separate quarterly scope, and a conditional high-risk information override with a named approver.
 
 The engine evaluates **Scrum, Kanban, Predictive delivery, Predictive–Agile Hybrid, Critical Chain, Shape Up, and Scrumban**. These methods are intentionally different enough to expose meaningful tradeoffs rather than presenting several near-identical agile frameworks.
 
@@ -99,7 +99,7 @@ Accepts the assessment payload after the browser obtains a one-time grant from `
 - three alternatives with selection tradeoffs;
 - optional AI-generated interpretation when configured.
 
-The payload must include `dataUseAuthorized: true`. Quarterly planning, training, and high-risk information are separate scopes. Training remains disabled even when requested. Confidential or high-risk information also requires selected categories, authority confirmation, and an accepted versioned informed-risk override. The endpoint refuses requests that exceed the granted purpose or request denied capabilities.
+The payload must include `dataUseAuthorized: true`, the authorized submitter's name and work email, an allowed authority role, and a named human decision owner. Quarterly planning is a separate scope. **Training and retention are not features in this release:** there is no training consent, training pipeline, or later-use retention path. Confidential or high-risk information also requires selected categories, a named approver with an allowed role, authority confirmation, and an accepted versioned informed-risk override. The endpoint refuses requests that omit those server-validated records, exceed the granted purpose, or request denied capabilities.
 
 ### `GET /api/methodologies`
 
@@ -181,7 +181,7 @@ The method profiles are grounded in primary or authoritative guidance, while the
 
 ## License and use
 
-No license file was present in the source repository at the time of this repurpose. Add an explicit license before distributing modified versions outside your organization.
+Project Compass is proprietary software under the **Project Compass Proprietary Internal-Use License** in `LICENSE`. Authorized internal employees and contractors may use it only for the designated organization's approved internal operations, security review, and maintenance. Distribution, personal forks, third-party hosting, commercialization, and model-training use require separate written authorization from the copyright owner.
 
 ## References
 

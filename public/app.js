@@ -74,10 +74,16 @@ function collectInput() {
     interruptionLevel: data.get("interruptionLevel") || "medium",
     preference: data.get("preference") || "none",
     dataUseAuthorized: data.get("dataUseAuthorized") === "yes",
+    submitterName: data.get("submitterName") || "",
+    submitterWorkEmail: data.get("submitterWorkEmail") || "",
+    authorityRole: data.get("authorityRole") || "",
+    decisionOwnerName: data.get("decisionOwnerName") || "",
+    decisionOwnerRole: data.get("decisionOwnerRole") || "",
     quarterlyPlanningAuthorized: data.get("quarterlyPlanningAuthorized") === "yes",
-    trainingUseAuthorized: data.get("trainingUseAuthorized") === "yes",
     confidentialInfoIncluded: data.get("confidentialInfoIncluded") === "yes",
     confidentialInfoAuthorized: data.get("confidentialInfoAuthorized") === "yes",
+    highRiskApproverName: data.get("highRiskApproverName") || "",
+    highRiskApproverRole: data.get("highRiskApproverRole") || "",
     highRiskOverrideAccepted: data.get("highRiskOverrideAccepted") === "yes",
     highRiskCategories: data.getAll("highRiskCategories"),
     capabilities: data.getAll("capabilities")
@@ -88,10 +94,14 @@ function saveDraft() {
   try {
     const input = collectInput();
     input.dataUseAuthorized = false;
+    input.submitterName = "";
+    input.submitterWorkEmail = "";
+    input.authorityRole = "";
     input.quarterlyPlanningAuthorized = false;
-    input.trainingUseAuthorized = false;
     input.confidentialInfoIncluded = false;
     input.confidentialInfoAuthorized = false;
+    input.highRiskApproverName = "";
+    input.highRiskApproverRole = "";
     input.highRiskOverrideAccepted = false;
     input.highRiskCategories = [];
     localStorage.setItem(DRAFT_KEY, JSON.stringify({ input, highestStep }));
@@ -162,8 +172,15 @@ function validateStep(step) {
   if (step === 4 && input.teamSize < 1) errors.teamSize = "Team size must be at least one.";
   if (step === 5) {
     if (!input.dataUseAuthorized) errors.dataUseAuthorized = "Confirm that you are authorized to share the information and permit its use only for the stated company-planning purposes.";
+    if (input.submitterName.trim().length < 2) errors.submitterName = "Enter the authorized submitter's name.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.submitterWorkEmail)) errors.submitterWorkEmail = "Enter the submitter's valid work email.";
+    if (!input.authorityRole) errors.authorityRole = "Attach an allowed authority role to this request.";
+    if (input.decisionOwnerName.trim().length < 2) errors.decisionOwnerName = "Name the human accountable for this decision brief.";
+    if (input.decisionOwnerRole.trim().length < 2) errors.decisionOwnerRole = "Enter the accountable decision owner's role.";
     if (input.confidentialInfoIncluded && input.highRiskCategories.length === 0) errors.highRiskCategories = "Select every high-risk information category included in the submission.";
     if (input.confidentialInfoIncluded && !input.confidentialInfoAuthorized) errors.confidentialInfoAuthorized = "Confirm that you are authorized to disclose and process the selected high-risk categories.";
+    if (input.confidentialInfoIncluded && input.highRiskApproverName.trim().length < 2) errors.highRiskApproverName = "Name the human who approved this high-risk override.";
+    if (input.confidentialInfoIncluded && !input.highRiskApproverRole) errors.highRiskApproverRole = "Attach an allowed high-risk approver role.";
     if (input.confidentialInfoIncluded && !input.highRiskOverrideAccepted) errors.highRiskOverrideAccepted = "Review and accept the informed-risk override, or remove the high-risk information.";
   }
   showErrors(errors);
@@ -176,7 +193,7 @@ function stepForError(name) {
   if (["budget", "deadline", "objectives"].includes(name)) return 1;
   if (["companyGoals", "departmentGoals", "teamGoals"].includes(name)) return 2;
   if (["constraints", "scopeCertainty", "changeFrequency", "compliance"].includes(name)) return 3;
-  if (["dataUseAuthorized", "highRiskCategories", "confidentialInfoAuthorized", "highRiskOverrideAccepted"].includes(name)) return 5;
+  if (["dataUseAuthorized", "submitterName", "submitterWorkEmail", "authorityRole", "decisionOwnerName", "decisionOwnerRole", "highRiskCategories", "confidentialInfoAuthorized", "highRiskApproverName", "highRiskApproverRole", "highRiskOverrideAccepted"].includes(name)) return 5;
   return 4;
 }
 
@@ -225,20 +242,22 @@ function syncHighRiskPanel() {
   if (!included) {
     document.querySelectorAll('[name="highRiskCategories"]').forEach((field) => { field.checked = false; });
     byId("confidential-info-authorized").checked = false;
+    byId("high-risk-approver-name").value = "";
+    byId("high-risk-approver-role").value = "";
     resetHighRiskOverride();
   }
 }
 
 byId("budget-disclosure").addEventListener("change", syncBudgetDisclosure);
 byId("confidential-info-included").addEventListener("change", syncHighRiskPanel);
-["quarterly-planning-authorized", "training-use-authorized", "confidential-info-authorized"].forEach((id) => byId(id).addEventListener("change", () => {
+["quarterly-planning-authorized", "confidential-info-authorized", "high-risk-approver-name", "high-risk-approver-role"].forEach((id) => byId(id).addEventListener("change", () => {
   if (byId("confidential-info-included").checked) resetHighRiskOverride();
 }));
 document.querySelectorAll('[name="highRiskCategories"]').forEach((field) => field.addEventListener("change", resetHighRiskOverride));
 byId("review-high-risk-override").addEventListener("click", () => byId("high-risk-dialog").showModal());
 byId("accept-high-risk-override").addEventListener("click", () => {
   byId("high-risk-override-accepted").value = "yes";
-  byId("override-status").textContent = "Accepted · company-data-authorization-2026-09-21-v1";
+  byId("override-status").textContent = "Accepted · company-data-authorization-2026-09-21-v2";
   byId("override-status").classList.add("is-accepted");
   document.querySelector('[data-error-for="highRiskOverrideAccepted"]').textContent = "";
 });
@@ -300,6 +319,12 @@ function renderResults(data) {
   const organizationAnalysis = data.organizationAnalysis;
   byId("results-project-name").textContent = data.project.name;
   byId("result-notice").textContent = data.notice;
+  byId("accountable-owner").textContent = data.accountability.decisionOwner.name;
+  byId("accountable-owner-role").textContent = data.accountability.decisionOwner.role;
+  byId("authorized-submitter").textContent = data.authorization.submittedBy.name;
+  byId("authorized-submitter-role").textContent = `${labelize(data.authorization.submittedBy.authorityRole)} · ${data.authorization.submittedBy.workEmail}`;
+  byId("authorization-policy-owner").textContent = data.authorization.policyOwner;
+  byId("authorization-timestamp").textContent = `Authorized ${new Date(data.authorization.grantedAt).toLocaleString()}`;
   byId("materiality-question").textContent = organizationAnalysis.question;
   byId("materiality-answer").textContent = organizationAnalysis.answer;
   byId("analysis-objective").textContent = organizationAnalysis.objective;

@@ -3,7 +3,7 @@ import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypt
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { methodologyCatalog, recommendProject } from "./recommendation-engine.js";
+import { CONSENT_VERSION, methodologyCatalog, recommendProject } from "./recommendation-engine.js";
 import { authorizePlanningCapabilities } from "./capability-policy.js";
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
@@ -372,9 +372,10 @@ export async function requestListener(request, response) {
       ok: true,
       service: "project-compass",
       runtime: "self-hosted-node",
-      recommendationEngine: "transparent-model-v2",
+      recommendationEngine: "transparent-model-v2.1",
       aiAssist: { configured: config.enabled, model: config.enabled ? config.model : null },
       storage: "stateless",
+      authorizationPolicy: { version: CONSENT_VERSION, attributableRolesRequired: true, trainingAndRetentionAvailable: false },
       security: { requestTokens: "one-time-origin-bound", replayProtection: true, maxBodyBytes: MAX_BODY_BYTES },
       worker: { mode: "bounded-local-queue", maxConcurrentAiJobs: MAX_CONCURRENT_AI_JOBS, maxQueueDepth: MAX_AI_QUEUE_DEPTH }
     });

@@ -316,6 +316,11 @@
 
             <div class="authorization-card">
               <p class="authorization-kicker">1 · Required company-information authorization</p>
+              <div class="field-grid three-columns authorization-identity">
+                <div class="field"><label for="submitter-name">Authorized submitter</label><input id="submitter-name" name="submitterName" type="text" maxlength="120" autocomplete="name" required><p class="field-error" data-error-for="submitterName"></p></div>
+                <div class="field"><label for="submitter-work-email">Work email</label><input id="submitter-work-email" name="submitterWorkEmail" type="email" maxlength="254" autocomplete="email" required><p class="field-error" data-error-for="submitterWorkEmail"></p></div>
+                <div class="field"><label for="authority-role">Authority attached to request</label><select id="authority-role" name="authorityRole" required><option value="">Select role</option><option value="executive-sponsor">Executive sponsor</option><option value="data-owner">Company data owner</option><option value="project-owner">Project owner</option><option value="security-privacy">Security / privacy authority</option><option value="delegated-written-authority">Documented delegated authority</option></select><p class="field-error" data-error-for="authorityRole"></p></div>
+              </div>
               <label class="authorization-control" for="data-use-authorized">
                 <input id="data-use-authorized" name="dataUseAuthorized" type="checkbox" value="yes" required>
                 <span><strong>I confirm that I am authorized to share this company and project information.</strong><small>I authorize its use only to develop recommendations, plans, and delivery frameworks for the company described above.</small></span>
@@ -324,26 +329,23 @@
               <p class="field-error" data-error-for="dataUseAuthorized"></p>
             </div>
 
-            <div class="consent-scope-grid">
-              <div class="authorization-card authorization-card-optional">
-                <p class="authorization-kicker">2 · Optional quarterly planning</p>
-                <label class="authorization-control" for="quarterly-planning-authorized">
-                  <input id="quarterly-planning-authorized" name="quarterlyPlanningAuthorized" type="checkbox" value="yes">
-                  <span><strong>I authorize use for quarterly planning.</strong><small>Project Compass may use the submitted information to produce a 90-day plan and planning-cycle recommendations.</small></span>
-                </label>
-              </div>
+            <div class="authorization-card authorization-card-optional">
+              <p class="authorization-kicker">2 · Optional quarterly planning</p>
+              <label class="authorization-control" for="quarterly-planning-authorized">
+                <input id="quarterly-planning-authorized" name="quarterlyPlanningAuthorized" type="checkbox" value="yes">
+                <span><strong>I authorize use for quarterly planning.</strong><small>Project Compass may use the submitted information to produce a 90-day plan and planning-cycle recommendations.</small></span>
+              </label>
+            </div>
+            <p class="scope-exclusion"><strong>Training and retention are out of scope.</strong> This release has no training pipeline, no training-use consent, and no feature that can retain submissions for later training.</p>
 
-              <div class="authorization-card authorization-card-optional">
-                <p class="authorization-kicker">3 · Optional training request</p>
-                <label class="authorization-control" for="training-use-authorized">
-                  <input id="training-use-authorized" name="trainingUseAuthorized" type="checkbox" value="yes">
-                  <span><strong>I request and authorize training use.</strong><small>This deployment does not retain submissions or train on them. The request is recorded but remains disabled until stated retention, security, and deletion controls are configured.</small></span>
-                </label>
-              </div>
+            <div class="authorization-card accountable-owner-card">
+              <p class="authorization-kicker">Named human accountability</p>
+              <div class="field-grid"><div class="field"><label for="decision-owner-name">Accountable decision owner</label><input id="decision-owner-name" name="decisionOwnerName" type="text" maxlength="120" required><p class="field-error" data-error-for="decisionOwnerName"></p></div><div class="field"><label for="decision-owner-role">Decision owner's role</label><input id="decision-owner-role" name="decisionOwnerRole" type="text" maxlength="160" placeholder="e.g. VP, Operations" required><p class="field-error" data-error-for="decisionOwnerRole"></p></div></div>
+              <p class="authorization-detail">This named person is accountable for validating the information, interpreting the recommendation, and deciding whether to act. Optional AI narrative is advisory and cannot approve or execute an action.</p>
             </div>
 
             <div class="high-risk-warning">
-              <div class="warning-heading"><span aria-hidden="true">!</span><div><p class="authorization-kicker">4 · Confidential or high-risk information</p><strong>Do not submit sensitive information by default.</strong></div></div>
+              <div class="warning-heading"><span aria-hidden="true">!</span><div><p class="authorization-kicker">3 · Confidential or high-risk information</p><strong>Do not submit sensitive information by default.</strong></div></div>
               <p>Do not submit trade secrets, credentials, authentication tokens, personal data, regulated information, or other highly sensitive material unless you are authorized to disclose it and have reviewed your organization's requirements. Providing information to this system does not change its legal classification or your organization's confidentiality obligations.</p>
               <label class="authorization-control" for="confidential-info-included">
                 <input id="confidential-info-included" name="confidentialInfoIncluded" type="checkbox" value="yes">
@@ -351,6 +353,7 @@
               </label>
 
               <div class="high-risk-panel" id="high-risk-panel" hidden>
+                <div class="field-grid authorization-identity"><div class="field"><label for="high-risk-approver-name">Override approver</label><input id="high-risk-approver-name" name="highRiskApproverName" type="text" maxlength="120"><p class="field-error" data-error-for="highRiskApproverName"></p></div><div class="field"><label for="high-risk-approver-role">Approver authority</label><select id="high-risk-approver-role" name="highRiskApproverRole"><option value="">Select role</option><option value="executive-sponsor">Executive sponsor</option><option value="data-owner">Company data owner</option><option value="security-privacy">Security / privacy authority</option></select><p class="field-error" data-error-for="highRiskApproverRole"></p></div></div>
                 <fieldset class="field">
                   <legend>Categories included <span>Select all that apply</span></legend>
                   <div class="risk-category-grid">
@@ -373,7 +376,7 @@
                 <p class="field-error" data-error-for="highRiskOverrideAccepted"></p>
               </div>
             </div>
-            <p class="consent-version">Consent policy: company-data-authorization-2026-09-21-v1</p>
+            <p class="consent-version">Policy owner: Application owner (1243353366) · Consent policy: company-data-authorization-2026-09-21-v2</p>
           </section>
 
           <footer class="form-actions">
@@ -400,6 +403,12 @@
       </header>
 
       <div class="result-disclaimer"><strong>Recommendation, not verdict.</strong><span id="result-notice">Treat this as a decision-support view based on the inputs supplied.</span></div>
+
+      <section class="accountability-strip">
+        <div><span>Accountable decision owner</span><strong id="accountable-owner"></strong><small id="accountable-owner-role"></small></div>
+        <div><span>Authorized submitter</span><strong id="authorized-submitter"></strong><small id="authorized-submitter-role"></small></div>
+        <div><span>Policy owner</span><strong id="authorization-policy-owner"></strong><small id="authorization-timestamp"></small></div>
+      </section>
 
       <section class="result-section objective-analysis-section">
         <div class="section-heading"><div><p class="eyebrow">Authorized information analysis</p><h3 id="materiality-question">Does this information materially affect the organization's stated objective?</h3></div><p id="materiality-answer"></p></div>
@@ -499,9 +508,9 @@
       <p class="authorization-kicker">High-risk information override</p>
       <h2 id="high-risk-dialog-title">Review the risk before continuing.</h2>
       <p>You have been warned that submitting confidential, proprietary, trade-secret, personal, regulated, or otherwise sensitive information may create legal, contractual, security, or confidentiality risks.</p>
-      <p>By continuing, you confirm that you have reviewed these warnings, are authorized to provide the information, understand the selected processing purposes, accept responsibility for determining whether disclosure is permitted, and intentionally choose to proceed despite the warnings.</p>
+      <p>By continuing, the authorized submitter attests that the named approver and attached authority role have reviewed these warnings, approved processing for the selected purposes, and accepted responsibility for determining whether disclosure is permitted. The approver identity, role, consent version, and timestamp will be included in the decision brief.</p>
       <div class="dialog-warning"><strong>This is not a liability waiver.</strong> It does not override applicable law, change the information's legal classification, or remove your organization's confidentiality obligations.</div>
-      <div class="dialog-actions"><button class="button button-ghost" id="cancel-high-risk-override" value="cancel">Cancel</button><button class="button button-primary" id="accept-high-risk-override" value="accept">I understand and proceed</button></div>
+      <div class="dialog-actions"><button class="button button-ghost" id="cancel-high-risk-override" value="cancel">Cancel</button><button class="button button-primary" id="accept-high-risk-override" value="accept">Record approval and proceed</button></div>
     </form>
   </dialog>
 

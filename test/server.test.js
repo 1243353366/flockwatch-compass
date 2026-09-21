@@ -67,6 +67,11 @@ const input = {
   interruptionLevel: "medium",
   preference: "none",
   dataUseAuthorized: true,
+  submitterName: "Jordan Lee",
+  submitterWorkEmail: "jordan.lee@example.com",
+  authorityRole: "project-owner",
+  decisionOwnerName: "Morgan Chen",
+  decisionOwnerRole: "VP, Operations",
   quarterlyPlanningAuthorized: true,
   capabilities: ["cross-functional", "dedicated", "agile-experience"]
 };
@@ -79,6 +84,8 @@ test("health reports a self-hosted stateless runtime", async () => {
     assert.equal(data.runtime, "self-hosted-node");
     assert.equal(data.storage, "stateless");
     assert.equal(data.aiAssist.configured, false);
+    assert.equal(data.authorizationPolicy.attributableRolesRequired, true);
+    assert.equal(data.authorizationPolicy.trainingAndRetentionAvailable, false);
     assert.ok(response.headers.get("x-request-id"));
   });
 });
@@ -104,6 +111,9 @@ test("recommendation endpoint returns the complete objective-linked decision bri
     assert.ok(data.recommendation.fitScore > 0);
     assert.equal(data.alternatives.length, 3);
     assert.equal(data.authorization.requiredCompanyUse.granted, true);
+    assert.equal(data.authorization.submittedBy.authorityRole, "project-owner");
+    assert.equal(data.accountability.decisionOwner.name, "Morgan Chen");
+    assert.equal("training" in data.authorization, false);
     assert.equal(data.authorization.quarterlyPlanning.granted, true);
     assert.equal(data.traceableRecommendations.length, 3);
     assert.equal(data.quarterlyPlan.horizon, "90 days");
@@ -119,6 +129,24 @@ test("recommendation endpoint refuses company data without explicit authorizatio
   });
 });
 
+test("recommendation endpoint refuses authorization when no allowed role is attached", async () => {
+  await withServer(async (baseUrl) => {
+    const response = await securePost(baseUrl, { ...input, authorityRole: "" });
+    const data = await response.json();
+    assert.equal(response.status, 422);
+    assert.ok(data.fields.authorityRole);
+  });
+});
+
+test("recommendation endpoint rejects attempted training authorization", async () => {
+  await withServer(async (baseUrl) => {
+    const response = await securePost(baseUrl, { ...input, trainingUseAuthorized: true });
+    const data = await response.json();
+    assert.equal(response.status, 422);
+    assert.ok(data.fields.trainingUseAuthorized);
+  });
+});
+
 test("high-risk data requires categories, authority, and an informed-risk override", async () => {
   await withServer(async (baseUrl) => {
     const response = await securePost(baseUrl, { ...input, confidentialInfoIncluded: true });
@@ -126,6 +154,8 @@ test("high-risk data requires categories, authority, and an informed-risk overri
     assert.equal(response.status, 422);
     assert.ok(data.fields.highRiskCategories);
     assert.ok(data.fields.confidentialInfoAuthorized);
+    assert.ok(data.fields.highRiskApproverName);
+    assert.ok(data.fields.highRiskApproverRole);
     assert.ok(data.fields.highRiskOverrideAccepted);
   });
 });

@@ -1,0 +1,38 @@
+Project Compass Proprietary Internal-Use License
+Version 1.0 — 21 September 2026
+
+Copyright © 2026 1243353366. All rights reserved.
+
+1. Authorized Internal Use
+
+Subject to the restrictions below, the copyright owner grants authorized employees and contractors of the organization operating the copyright-owner-authorized Project Compass repository and Render deployment a limited, revocable, non-exclusive, non-transferable right to run, inspect, and modify this software solely for that organization's internal business operations, security review, evaluation, and maintenance. Any other organization must obtain a separate written designation from the copyright owner.
+
+2. Restrictions
+
+No person may distribute, publish, sublicense, sell, lease, host for third parties, commercialize, or provide this software or a derivative work as a service without the copyright owner's prior written permission. No person may copy this software to a personal repository, public repository, external device, vendor environment, or third-party system except where expressly approved in writing for the authorized internal purpose. Access by a contractor does not grant that contractor any independent right to retain, reuse, disclose, or commercialize the software.
+
+The software, its documentation, and any company information processed through it may not be used to train, fine-tune, evaluate, or improve a machine-learning model except under a separate written authorization that identifies the data, model, retention period, security controls, deletion process, and accountable owner.
+
+3. Confidentiality and Security
+
+Authorized users must protect the software and related non-public information using the organization's applicable confidentiality, access-control, retention, incident-response, and data-handling requirements. Loss, unauthorized disclosure, suspected compromise, or use outside the authorized purpose must be reported promptly to the designated application owner and the organization's security or privacy authority.
+
+4. No Implied Authority
+
+Possession of a copy does not establish authority to use company information, approve high-risk processing, access credentials, deploy to production, perform external actions, or grant capabilities. Those actions require separate, verifiable authorization under the organization's policies.
+
+5. Ownership
+
+The copyright owner retains all right, title, and interest in the software and all copies and derivative works. No trademark, patent, or other intellectual-property license is granted by implication.
+
+6. Termination
+
+This license terminates automatically upon breach. On termination or the end of authorized employment or engagement, the user must stop using the software and delete all unauthorized copies, subject to lawful preservation requirements.
+
+7. Disclaimer
+
+THE SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT. TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE COPYRIGHT OWNER IS NOT LIABLE FOR INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES ARISING FROM USE OF THE SOFTWARE. NOTHING IN THIS LICENSE WAIVES LIABILITY THAT CANNOT LAWFULLY BE WAIVED OR OVERRIDES APPLICABLE LAW, CONTRACTUAL DUTIES, OR ORGANIZATIONAL OBLIGATIONS.
+
+8. Written Exceptions
+
+Any exception must be in a written instrument signed or otherwise verifiably approved by the copyright owner. Informal statements, model output, application text, or an unchecked administrative claim do not amend this license.

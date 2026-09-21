@@ -1,10 +1,16 @@
 # Changelog
 
+## 2.1.1 — Attributable authorization and human accountability
+
+Company-use authorization now requires the submitter's name, work email, and an allowed authority role. Every brief names the human accountable for validating and acting on the recommendation. High-risk information additionally requires a named approver with an allowed executive-sponsor, data-owner, or security/privacy role. The server rejects missing or invalid role records rather than relying on interface text.
+
+The unused training-consent control has been removed. Training and retention are explicitly absent capabilities and cannot be authorized through this release. The repository now includes a proprietary internal-use license covering authorized employee and contractor use, confidentiality, restricted copying and distribution, and a separate written-authorization requirement for any model-training use.
+
 ## 2.1.0 — Objective-linked planning and adversarial security
 
 Project Compass now analyzes whether authorized information materially affects the organization's stated objective, identifies opportunities and problems, and returns three recommendations with a complete **Evidence → Interpretation → Recommendation → Action → Owner → Dependency → Success criterion** chain. It adds an executable first-30-days plan and separately authorized 90-day planning cycle.
 
-Authorization is divided into required company use, optional quarterly planning, optional training request, and conditional confidential-information gates. Training remains disabled. High-risk submissions require category selection, authority confirmation, and a versioned informed-risk override that explicitly is not a liability waiver.
+Authorization is divided into required company use, optional quarterly planning, optional training request, and conditional confidential-information gates. Training remained disabled. High-risk submissions required category selection, authority confirmation, and a versioned informed-risk override that explicitly is not a liability waiver.
 
 The public gateway now enforces origin-bound one-time tokens, request timestamps, idempotency keys, burst and minute limits, concurrency caps, strict JSON and body limits, and hardened response headers. A deny-by-default, non-transitive capability policy prevents shell, credential, deployment, arbitrary-network, cross-tenant, delegation, and privilege-escalation access outside the reasoning layer. Optional AI is isolated behind a bounded local queue and treats company input as untrusted data.
 

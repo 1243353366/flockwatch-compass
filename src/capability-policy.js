@@ -18,6 +18,8 @@ const NEVER_GRANTED = Object.freeze([
   "process.spawn",
   "filesystem.root",
   "production.deploy",
+  "model.train",
+  "data.retain",
   "capability.delegate",
   "privilege.escalate",
   "authorization.admin_claim",

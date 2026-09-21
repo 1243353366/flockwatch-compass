@@ -8,8 +8,11 @@ const HIERARCHY = Object.freeze({ flat: 0.18, functional: 0.52, matrix: 0.78, hi
 const CADENCE = Object.freeze({ "one-time": 0.12, milestones: 0.5, biweekly: 0.78, continuous: 1 });
 const BUDGET_PRESSURE = Object.freeze({ flexible: 0.2, fixed: 0.62, tight: 0.95 });
 const PREFERENCE = Object.freeze({ none: null, agile: "scrum", structured: "predictive", flow: "kanban", hybrid: "hybrid" });
-export const CONSENT_VERSION = "company-data-authorization-2026-09-21-v1";
+export const CONSENT_VERSION = "company-data-authorization-2026-09-21-v2";
 const HIGH_RISK_CATEGORIES = Object.freeze(["confidential", "proprietary", "trade-secret", "personal", "regulated", "other-sensitive"]);
+const AUTHORITY_ROLES = Object.freeze(["executive-sponsor", "data-owner", "project-owner", "security-privacy", "delegated-written-authority"]);
+const HIGH_RISK_APPROVER_ROLES = Object.freeze(["executive-sponsor", "data-owner", "security-privacy"]);
+const AUTHORIZATION_POLICY_OWNER = process.env.AUTHORIZATION_POLICY_OWNER || "Application owner (1243353366)";
 
 export const METHODOLOGIES = Object.freeze([
   {
@@ -175,10 +178,17 @@ export function normalizeInput(raw = {}) {
     interruptionLevel: choice(raw.interruptionLevel, ["low", "medium", "high"], "medium"),
     preference: choice(raw.preference, ["none", "agile", "structured", "flow", "hybrid"], "none"),
     dataUseAuthorized: raw.dataUseAuthorized === true,
+    submitterName: text(raw.submitterName, 120),
+    submitterWorkEmail: text(raw.submitterWorkEmail, 254).toLowerCase(),
+    authorityRole: choice(raw.authorityRole, AUTHORITY_ROLES, ""),
+    decisionOwnerName: text(raw.decisionOwnerName, 120),
+    decisionOwnerRole: text(raw.decisionOwnerRole, 160),
     quarterlyPlanningAuthorized: raw.quarterlyPlanningAuthorized === true,
-    trainingUseAuthorized: raw.trainingUseAuthorized === true,
+    trainingUseRequested: raw.trainingUseAuthorized === true || raw.trainingUseRequested === true,
     confidentialInfoIncluded: raw.confidentialInfoIncluded === true,
     confidentialInfoAuthorized: raw.confidentialInfoAuthorized === true,
+    highRiskApproverName: text(raw.highRiskApproverName, 120),
+    highRiskApproverRole: choice(raw.highRiskApproverRole, HIGH_RISK_APPROVER_ROLES, ""),
     highRiskOverrideAccepted: raw.highRiskOverrideAccepted === true,
     highRiskCategories: Array.isArray(raw.highRiskCategories)
       ? [...new Set(raw.highRiskCategories.filter((item) => HIGH_RISK_CATEGORIES.includes(item)))].slice(0, HIGH_RISK_CATEGORIES.length)
@@ -199,7 +209,15 @@ export function validateInput(input) {
   if (!input.teamGoals) errors.teamGoals = "Add at least one team-member or team goal.";
   if (input.teamSize < 1) errors.teamSize = "Team size must be at least one.";
   if (!input.dataUseAuthorized) errors.dataUseAuthorized = "Explicit company-data authorization is required before Project Compass can generate a recommendation or framework.";
+  if (input.submitterName.length < 2) errors.submitterName = "Enter the name of the person submitting and authorizing this information.";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.submitterWorkEmail)) errors.submitterWorkEmail = "Enter the submitter's valid work email address.";
+  if (!input.authorityRole) errors.authorityRole = "Attach an allowed authority role to this request.";
+  if (input.decisionOwnerName.length < 2) errors.decisionOwnerName = "Name the human accountable for acting on this decision brief.";
+  if (input.decisionOwnerRole.length < 2) errors.decisionOwnerRole = "Enter the accountable decision owner's role.";
+  if (input.trainingUseRequested) errors.trainingUseAuthorized = "Training and retention are not available capabilities in this release and cannot be authorized through this request.";
   if (input.confidentialInfoIncluded && !input.confidentialInfoAuthorized) errors.confidentialInfoAuthorized = "Confirm that you are authorized to disclose and process the identified confidential or trade-secret information.";
+  if (input.confidentialInfoIncluded && input.highRiskApproverName.length < 2) errors.highRiskApproverName = "Name the human who approved the high-risk information override.";
+  if (input.confidentialInfoIncluded && !input.highRiskApproverRole) errors.highRiskApproverRole = "Attach an allowed high-risk approver role.";
   if (input.confidentialInfoIncluded && input.highRiskCategories.length === 0) errors.highRiskCategories = "Select every high-risk information category included in the submission.";
   if (input.confidentialInfoIncluded && !input.highRiskOverrideAccepted) errors.highRiskOverrideAccepted = "Review and accept the informed-risk override, or remove the high-risk information before submitting.";
   return errors;
@@ -631,10 +649,11 @@ export function recommendProject(rawInput) {
     authorization: {
       consentVersion: CONSENT_VERSION,
       grantedAt: generatedAt,
+      policyOwner: AUTHORIZATION_POLICY_OWNER,
+      submittedBy: { name: input.submitterName, workEmail: input.submitterWorkEmail, authorityRole: input.authorityRole },
       selectedPurposes: [
         "recommendations-plans-delivery-frameworks",
-        ...(input.quarterlyPlanningAuthorized ? ["quarterly-planning"] : []),
-        ...(input.trainingUseAuthorized ? ["training-requested-but-disabled"] : [])
+        ...(input.quarterlyPlanningAuthorized ? ["quarterly-planning"] : [])
       ],
       requiredCompanyUse: {
         granted: true,
@@ -644,19 +663,20 @@ export function recommendProject(rawInput) {
         granted: input.quarterlyPlanningAuthorized,
         scope: "Quarterly planning and planning-cycle recommendations."
       },
-      training: {
-        requested: input.trainingUseAuthorized,
-        enabled: false,
-        status: input.trainingUseAuthorized ? "Consent recorded, but training use is disabled because retention and deletion controls are not configured." : "Not authorized."
-      },
       confidentialInformation: {
         declared: input.confidentialInfoIncluded,
         authorized: input.confidentialInfoIncluded ? input.confidentialInfoAuthorized : false,
+        approvedBy: input.confidentialInfoIncluded ? { name: input.highRiskApproverName, authorityRole: input.highRiskApproverRole } : null,
         categories: input.confidentialInfoIncluded ? input.highRiskCategories : [],
         informedRiskOverrideAccepted: input.confidentialInfoIncluded ? input.highRiskOverrideAccepted : false,
         disclaimer: "The override records informed choice and does not waive liability, change legal classification, or displace applicable law or organizational obligations."
       },
       purposeLimitation: "These grants do not permit unrelated uses, disclosure, or secondary processing beyond the selected purposes and apply only to information the submitter is permitted to provide."
+    },
+    accountability: {
+      decisionOwner: { name: input.decisionOwnerName, role: input.decisionOwnerRole },
+      responsibility: "This named human owns validation, interpretation, and the decision to act on the brief, including any optional AI-authored narrative.",
+      aiBoundary: "AI output is advisory and cannot approve, authorize, or execute an action."
     },
     project: {
       name: projectLabel,

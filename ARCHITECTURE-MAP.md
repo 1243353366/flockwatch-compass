@@ -54,7 +54,7 @@ The PM may state that an action would be useful. That does not grant the capabil
 
 ## Consent boundary
 
-The required grant covers only recommendations, plans, and delivery frameworks for the company. Quarterly planning is a separate optional scope. Training consent is separately recordable, but training remains disabled because the current deployment has no retention and deletion system. Confidential or high-risk information requires category selection, authority confirmation, and acceptance of a versioned informed-risk override. The override is not a liability waiver and does not change applicable law or the information's classification.
+The required grant covers only recommendations, plans, and delivery frameworks for the company. The server requires an attributable submitter name, work email, and allowed authority role, plus a named human decision owner. Quarterly planning is a separate optional scope. Training and retention are not implemented and cannot be authorized in this release. Confidential or high-risk information requires category selection, a named approver with an allowed role, authority confirmation, and acceptance of a versioned informed-risk override. The override is not a liability waiver and does not change applicable law or the information's classification.
 
 ## Evidence boundary
 

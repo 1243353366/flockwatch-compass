@@ -32,6 +32,11 @@ const base = {
   interruptionLevel: "medium",
   preference: "none",
   dataUseAuthorized: true,
+  submitterName: "Jordan Lee",
+  submitterWorkEmail: "jordan.lee@example.com",
+  authorityRole: "project-owner",
+  decisionOwnerName: "Morgan Chen",
+  decisionOwnerRole: "VP, Operations",
   capabilities: ["cross-functional", "dedicated"]
 };
 
@@ -43,46 +48,18 @@ test("catalog exposes seven distinct decision options", () => {
 });
 
 test("uncertain product work favors an adaptive approach", () => {
-  const result = recommendProject({
-    ...base,
-    scopeCertainty: "low",
-    changeFrequency: "high",
-    stakeholderAccess: "high",
-    deliveryCadence: "biweekly",
-    compliance: "low",
-    interruptionLevel: "low",
-    capabilities: ["cross-functional", "dedicated", "agile-experience", "discovery"]
-  });
+  const result = recommendProject({ ...base, scopeCertainty: "low", changeFrequency: "high", stakeholderAccess: "high", deliveryCadence: "biweekly", compliance: "low", interruptionLevel: "low", capabilities: ["cross-functional", "dedicated", "agile-experience", "discovery"] });
   assert.ok(["scrum", "shape-up", "scrumban"].includes(result.recommendation.methodId));
   assert.match(result.notice, /decision-support recommendation/i);
 });
 
 test("stable regulated work favors predictive or governed hybrid delivery", () => {
-  const result = recommendProject({
-    ...base,
-    scopeCertainty: "high",
-    changeFrequency: "low",
-    compliance: "high",
-    approvalLoad: "high",
-    hierarchy: "hierarchical",
-    dependencyLevel: "high",
-    deliveryCadence: "one-time",
-    capabilities: ["estimation", "specialists"]
-  });
+  const result = recommendProject({ ...base, scopeCertainty: "high", changeFrequency: "low", compliance: "high", approvalLoad: "high", hierarchy: "hierarchical", dependencyLevel: "high", deliveryCadence: "one-time", capabilities: ["estimation", "specialists"] });
   assert.ok(["predictive", "hybrid", "ccpm"].includes(result.recommendation.methodId));
 });
 
 test("interrupt-driven continuous work favors flow-based delivery", () => {
-  const result = recommendProject({
-    ...base,
-    scopeCertainty: "medium",
-    changeFrequency: "high",
-    deliveryCadence: "continuous",
-    interruptionLevel: "high",
-    compliance: "low",
-    dependencyLevel: "low",
-    preference: "flow"
-  });
+  const result = recommendProject({ ...base, scopeCertainty: "medium", changeFrequency: "high", deliveryCadence: "continuous", interruptionLevel: "high", compliance: "low", dependencyLevel: "low", preference: "flow" });
   assert.ok(["kanban", "scrumban"].includes(result.recommendation.methodId));
 });
 
@@ -102,32 +79,26 @@ test("quarterly planning is generated only with separate authorization", () => {
   assert.equal(authorized.authorization.quarterlyPlanning.granted, true);
 });
 
-test("training consent is recorded but training remains disabled", () => {
-  const result = recommendProject({ ...base, trainingUseAuthorized: true });
-  assert.equal(result.authorization.training.requested, true);
-  assert.equal(result.authorization.training.enabled, false);
-  assert.match(result.authorization.training.status, /disabled/i);
+test("authorization and accountability are attributable", () => {
+  const result = recommendProject(base);
+  assert.equal(result.authorization.submittedBy.workEmail, "jordan.lee@example.com");
+  assert.equal(result.authorization.submittedBy.authorityRole, "project-owner");
+  assert.equal(result.accountability.decisionOwner.name, "Morgan Chen");
+  assert.match(result.accountability.aiBoundary, /cannot approve, authorize, or execute/i);
+  assert.equal("training" in result.authorization, false);
 });
 
-test("accepted high-risk information produces a versioned audit record", () => {
-  const result = recommendProject({
-    ...base,
-    confidentialInfoIncluded: true,
-    confidentialInfoAuthorized: true,
-    highRiskOverrideAccepted: true,
-    highRiskCategories: ["confidential", "trade-secret"]
-  });
+test("accepted high-risk information produces a versioned attributable audit record", () => {
+  const result = recommendProject({ ...base, confidentialInfoIncluded: true, confidentialInfoAuthorized: true, highRiskApproverName: "Riley Patel", highRiskApproverRole: "security-privacy", highRiskOverrideAccepted: true, highRiskCategories: ["confidential", "trade-secret"] });
   assert.equal(result.authorization.consentVersion, CONSENT_VERSION);
   assert.deepEqual(result.authorization.confidentialInformation.categories, ["confidential", "trade-secret"]);
   assert.equal(result.authorization.confidentialInformation.informedRiskOverrideAccepted, true);
+  assert.equal(result.authorization.confidentialInformation.approvedBy.name, "Riley Patel");
   assert.match(result.authorization.confidentialInformation.disclaimer, /does not waive liability/i);
 });
 
 test("validation rejects an incomplete decision brief", () => {
-  assert.throws(
-    () => recommendProject({ ...base, budget: 0, objectives: "Too short" }),
-    (error) => error.code === "VALIDATION_ERROR" && Boolean(error.fields.budget) && Boolean(error.fields.objectives)
-  );
+  assert.throws(() => recommendProject({ ...base, budget: 0, objectives: "Too short" }), (error) => error.code === "VALIDATION_ERROR" && Boolean(error.fields.budget) && Boolean(error.fields.objectives));
 });
 
 test("no-budget disclosure is allowed without a budget value", () => {
@@ -136,15 +107,26 @@ test("no-budget disclosure is allowed without a budget value", () => {
 });
 
 test("validation refuses company-data processing without explicit authorization", () => {
+  assert.throws(() => recommendProject({ ...base, dataUseAuthorized: false }), (error) => error.code === "VALIDATION_ERROR" && Boolean(error.fields.dataUseAuthorized));
+});
+
+test("validation refuses authorization without an attached role and accountable human", () => {
   assert.throws(
-    () => recommendProject({ ...base, dataUseAuthorized: false }),
-    (error) => error.code === "VALIDATION_ERROR" && Boolean(error.fields.dataUseAuthorized)
+    () => recommendProject({ ...base, authorityRole: "", decisionOwnerName: "", decisionOwnerRole: "" }),
+    (error) => error.code === "VALIDATION_ERROR" && Boolean(error.fields.authorityRole) && Boolean(error.fields.decisionOwnerName) && Boolean(error.fields.decisionOwnerRole)
   );
 });
 
-test("high-risk data is refused without categories, authority, and informed override", () => {
+test("legacy or direct training-use requests are rejected", () => {
+  assert.throws(
+    () => recommendProject({ ...base, trainingUseAuthorized: true }),
+    (error) => error.code === "VALIDATION_ERROR" && Boolean(error.fields.trainingUseAuthorized)
+  );
+});
+
+test("high-risk data is refused without categories, approver authority, and informed override", () => {
   assert.throws(
     () => recommendProject({ ...base, confidentialInfoIncluded: true }),
-    (error) => error.code === "VALIDATION_ERROR" && Boolean(error.fields.highRiskCategories) && Boolean(error.fields.confidentialInfoAuthorized) && Boolean(error.fields.highRiskOverrideAccepted)
+    (error) => error.code === "VALIDATION_ERROR" && Boolean(error.fields.highRiskCategories) && Boolean(error.fields.confidentialInfoAuthorized) && Boolean(error.fields.highRiskApproverName) && Boolean(error.fields.highRiskApproverRole) && Boolean(error.fields.highRiskOverrideAccepted)
   );
 });

@@ -10,7 +10,7 @@ function denied(requestedCapabilities) {
 }
 
 test("PM asking itself for shell or delegated capability is denied", () => {
-  denied(["host.shell", "capability.delegate"]);
+  denied(["host.shell", "capability.delegate", "model.train", "data.retain"]);
 });
 
 test("prompt-injected company text cannot add shell capability", () => {
