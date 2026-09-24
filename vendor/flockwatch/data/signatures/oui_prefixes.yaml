@@ -1,0 +1,16 @@
+# Known Flock vendor OUI prefixes
+# These are the first 3 octets of MAC addresses associated with Flock Safety devices.
+# Sources: public WiGLE data, community research, FCC OUI database.
+# Format: XX:XX:XX (colon-separated for readability)
+
+oui_prefixes:
+  # Flock Safety registered OUIs
+  - "C4:48:54"  # Flock Safety Inc
+  - "D8:31:34"  # Flock Safety Inc
+  - "F0:F5:BD"  # Flock Safety Inc (secondary)
+  - "AC:1F:0B"  # Flock Safety Inc (embedded module)
+
+  # Common ALPR camera vendors that may appear alongside Flock deployments
+  # Users should verify these against their own captures
+  - "00:1C:0E"  # Axis Communications (ALPR camera modules)
+  - "B8:27:EB"  # Raspberry Pi Foundation (embedded controllers)

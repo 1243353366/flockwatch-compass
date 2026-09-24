@@ -1,0 +1,36 @@
+# Wi-Fi detection rules for Flock devices
+# SSID patterns and BSSID rules
+
+ssid_patterns:
+  # Direct Flock SSID patterns
+  - "Flock"
+  - "FlockSafety"
+  - "Flock-"
+  - "FLK-"
+  - "ALPR"
+  - "Flock.*Camera"
+  - "Flock.*Node"
+
+  # Common ALPR-related SSIDs
+  - "PTZ-ALPR"
+  - "Sentry-ALPR"
+  - "LPR-Cam"
+
+# Additional BSSID rules (beyond OUI matching)
+# Format: BSSID prefix, description
+bssid_rules:
+  - prefix: "C4:48:54"
+    description: "Flock Safety device (direct OUI match)"
+  - prefix: "D8:31:34"
+    description: "Flock Safety device (direct OUI match)"
+
+# Wi-Fi channel preferences observed in Flock deployments
+# (used for additional confidence, not standalone detection)
+preferred_channels:
+  - 1
+  - 6
+  - 11
+
+# RSSI thresholds (dBm) — observations weaker than this are likely too far
+# to be relevant
+min_rssi_dbm: -90

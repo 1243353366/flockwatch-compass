@@ -1,0 +1,7 @@
+WigleWifi-1.4,appRelease=2.78,model=Pixel,modelRelease=14,device=Pixel,display=metrics,user=test
+MAC,SSID,AuthMode,FirstSeen,Channel,RSSI,CurrentLatitude,CurrentLongitude,AltitudeMeters,AccuracyMeters,Type
+C4:48:54:11:22:33,Flock-Cam-A1F2,WPA2,2026-09-23 18:30:00,6,-65,42.7392,-84.4083,260.5,10.0,WIFI
+D8:31:34:AA:BB:CC,FlockSafety-Node,WPA2,2026-09-23 18:30:05,11,-72,42.7395,-84.4088,261.0,12.0,WIFI
+C4:48:54:55:66:77,FLK-ALPR-003,WPA2,2026-09-23 18:30:10,1,-58,42.7400,-84.4090,262.0,8.0,WIFI
+00:1C:0E:DD:EE:FF,Axis-PTZ-Cam,WPA2,2026-09-23 18:30:15,6,-80,42.7380,-84.4070,259.0,15.0,WIFI
+AA:BB:CC:DD:EE:FF,HomeNetwork,WPA2,2026-09-23 18:30:20,6,-55,42.7385,-84.4075,260.0,10.0,WIFI

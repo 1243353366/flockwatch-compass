@@ -1,0 +1,5 @@
+{"timestamp":"2026-09-23T18:30:00Z","type":"wifi","mac":"C4:48:54:11:22:33","ssid":"Flock-Cam-A1F2","rssi":-65,"channel":6,"lat":42.7392,"lon":-84.4083,"accuracy_m":5.0,"encryption_type":"WPA2"}
+{"timestamp":"2026-09-23T18:30:02Z","type":"wifi","mac":"D8:31:34:AA:BB:CC","ssid":"FlockSafety-Node","rssi":-72,"channel":11,"lat":42.7395,"lon":-84.4088,"accuracy_m":5.0,"encryption_type":"WPA2"}
+{"timestamp":"2026-09-23T18:30:04Z","type":"ble","mac":"C4:48:54:55:66:77","ble_name":"Flock-Node-003","rssi":-58,"channel":0,"lat":42.7400,"lon":-84.4090,"accuracy_m":5.0,"ble_service_uuids":["0000fe59-0000-1000-8000-00805f9b34fb"],"ble_manufacturer_id":490}
+{"timestamp":"2026-09-23T18:30:06Z","type":"wifi","mac":"AA:BB:CC:DD:EE:FF","ssid":"HomeNetwork","rssi":-55,"channel":6,"lat":42.7385,"lon":-84.4075,"accuracy_m":5.0,"encryption_type":"WPA2"}
+{"timestamp":"2026-09-23T18:30:08Z","type":"ble","mac":"AC:1F:0B:99:88:77","ble_name":"FLK-ALPR","rssi":-62,"channel":0,"lat":42.7401,"lon":-84.4091,"accuracy_m":5.0,"ble_service_uuids":["00001801-0000-1000-8000-00805f9b34fb"],"ble_manufacturer_id":1537}

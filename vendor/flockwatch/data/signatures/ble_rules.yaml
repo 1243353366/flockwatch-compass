@@ -1,0 +1,31 @@
+# BLE detection rules for Flock devices
+# BLE service UUIDs, device name patterns, and manufacturer IDs
+
+service_uuids:
+  # Common BLE service UUIDs used by Flock hardware
+  - "0000fe59-0000-1000-8000-00805f9b34fb"  # Nordic UART (common in ESP32 modules)
+  - "00001801-0000-1000-8000-00805f9b34fb"  # Generic Attribute service
+  - "0000180a-0000-1000-8000-00805f9b34fb"  # Device Information service
+
+name_patterns:
+  # BLE device name patterns
+  - "Flock"
+  - "FLK"
+  - "FlockSafety"
+  - "Flock-"
+  - "ALPR"
+  - "Flock.*Cam"
+  - "Flock.*Node"
+
+# BLE manufacturer IDs (from Bluetooth SIG assigned numbers)
+# Flock Safety and related module manufacturers
+manufacturer_ids:
+  - 490  # Espressif Systems (ESP32 module manufacturer)
+  - 1537  # Nordic Semiconductor (nRF modules)
+
+# BLE advertisement timing patterns (ms)
+# Flock devices may have characteristic advertisement intervals
+expected_adv_intervals_ms:
+  - 100   # 100ms — fast advertising
+  - 1000  # 1s — standard advertising
+  - 2000  # 2s — power-saving mode
