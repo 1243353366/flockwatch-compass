@@ -1,0 +1,27 @@
+{
+  "name": "project-compass",
+  "version": "2.1.1",
+  "private": true,
+  "type": "module",
+  "description": "Render-hosted objective-linked project planning decision support with explicit consent and capability sandboxing",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "check": "node --check src/server.js && node --check src/recommendation-engine.js && node --check src/capability-policy.js && node --check public/app.js && node --check worker/index.js",
+    "test": "node --test",
+    "verify": "npm run check && npm test",
+    "worker": "node worker/index.js"
+  },
+  "dependencies": {
+    "bullmq": "6.3.8",
+    "ioredis": "6.0.0"
+  },
+  "homepage": "https://project-compass-advisor.onrender.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/1243353366/corpora-ai.git"
+  }
+}

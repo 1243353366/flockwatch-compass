@@ -1,0 +1,17 @@
+# Staged background-worker Blueprint.
+# This file is not connected to the current manually managed free web service.
+# Activating it creates paid worker compute. Review pricing and configure Payments first.
+services:
+  - type: worker
+    name: project-compass-planning-worker
+    runtime: node
+    region: oregon
+    plan: 0.5c-512mb
+    buildCommand: npm ci
+    startCommand: npm run worker
+    autoDeployTrigger: commit
+    envVars:
+      - key: QUEUE_URL
+        sync: false
+      - key: WORKER_CONCURRENCY
+        value: "2"
