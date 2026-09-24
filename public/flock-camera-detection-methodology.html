@@ -65,13 +65,13 @@
         </thead>
         <tbody>
           <tr>
-            <td><span class="tier-badge tier-candidate">Candidate</span></td>
+            <td><span class="tier-badge tier-candidate">Unconfirmed</span></td>
             <td>One weak indicator (e.g., single OUI match)</td>
             <td>May be a false positive. Insufficient for action.</td>
           </tr>
           <tr>
             <td><span class="tier-badge tier-probable">Probable</span></td>
-            <td>Multiple independent passive indicators, or repeated observations from different sources</td>
+            <td>Multiple independent passive indicators, or repeated observations across time</td>
             <td>Warrants further investigation. Collect more data.</td>
           </tr>
           <tr>
@@ -80,9 +80,9 @@
             <td>Strong evidence. Consider field verification.</td>
           </tr>
           <tr>
-            <td><span class="tier-badge tier-verified">Verified</span></td>
-            <td>Human confirmation or repeated verified observations</td>
-            <td>Confirmed location. Suitable for mapping.</td>
+            <td><span class="tier-badge tier-verified">Machine-supported</span></td>
+            <td>Repeated automated observations across multiple days + multiple RF modes + public corroboration</td>
+            <td>Highest automated confidence. No manual verification required.</td>
           </tr>
         </tbody>
       </table>
@@ -106,7 +106,7 @@
       </ul>
 
       <h2>Why Not Let the AI Decide?</h2>
-      <p>LLMs can hallucinate. They can pattern-match on insufficient evidence and confidently assert things that are wrong. In surveillance mapping, a false positive can mislead communities, waste resources, and erode trust. FlockWatch Compass keeps the AI in an explanatory role — it can summarize evidence, suggest next steps, and write reports — but the confidence tier is computed by deterministic code that anyone can inspect.</p>
+      <p>LLMs can hallucinate. They can pattern-match on insufficient evidence and confidently assert things that are wrong. In surveillance mapping, a false positive can mislead communities, waste resources, and erode trust. FlockWatch Compass keeps the AI in an explanatory role — it can summarize evidence, suggest next steps, and write reports — but the confidence tier is computed by deterministic code that anyone can inspect. No manual verification is required to reach the highest automated tier (machine-supported): repeated observations across multiple days using multiple RF modes, plus independent public corroboration, is sufficient.</p>
 
       <h2>Observation Schema</h2>
       <p>Each observation from the detector is a structured record:</p>

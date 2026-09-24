@@ -129,7 +129,7 @@ async function readBodyJson(req) {
 // ─── Handlers ────────────────────────────────────────────────────────────────
 async function handleResearch(req, res) {
   const body = await readBodyJson(req);
-  const { observations, city, state, humanVerified, wantNarrative, skipPublicLookup } = body;
+  const { observations, city, state, wantNarrative, skipPublicLookup } = body;
 
   if (!Array.isArray(observations)) {
     return sendJson(res, { error: "observations must be an array" }, 400);
@@ -137,7 +137,6 @@ async function handleResearch(req, res) {
 
   const result = await runResearchAgent(observations, {
     city, state,
-    humanVerified: humanVerified || false,
     wantNarrative: wantNarrative || false,
     skipPublicLookup: skipPublicLookup || false,
   });

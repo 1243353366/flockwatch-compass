@@ -136,7 +136,6 @@ def run_research_pipeline(
     observations: list[EvidenceObservation],
     city: Optional[str] = None,
     state: Optional[str] = None,
-    human_verified: bool = False,
     skip_public_lookup: bool = False,
 ) -> EvidenceReport:
     """
@@ -200,12 +199,11 @@ def run_research_pipeline(
         if fcc_match:
             public_sources.append(fcc_corroboration_as_public_source(fcc_match))
 
-    # Step 4: Build evidence report (deterministic confidence)
+    # Step 4: Build evidence report (deterministic confidence, no manual verification)
     report = build_evidence_report(
         observations=observations,
         public_corroboration=public_sources,
         fcc_match=fcc_match,
-        human_verified=human_verified,
     )
 
     return report

@@ -55,7 +55,7 @@
       <p class="description">FlockWatch Compass extracts radio frequency fingerprints from SDR I/Q captures and correlates them with FCC equipment authorization records. This page details the technical methodology.</p>
 
       <h2>What Is RF Fingerprinting?</h2>
-      <p>Every radio transmitter has subtle hardware imperfections — oscillator drift, filter responses, amplifier nonlinearities — that create a unique spectral signature. Even two devices of the same model produce slightly different RF fingerprints. FlockWatch Compass captures these fingerprints using software-defined radio and compares them against reference templates.</p>
+      <p>Every radio transmitter has subtle hardware imperfections — oscillator drift, filter responses, amplifier nonlinearities — that create a unique spectral signature. Even two devices of the same model produce slightly different RF fingerprints. FlockWatch Compass captures these fingerprints using software-defined radio and compares them against reference templates. The system also monitors Wi-Fi beacon frames and BLE advertisements — signals that wireless devices legally broadcast during normal operation to function. No transmission, probing, or jamming is required.</p>
 
       <h2>I/Q Capture Format</h2>
       <p>The system accepts raw I/Q (in-phase / quadrature) samples from any SDR — RTL-SDR, HackRF, LimeSDR, or USRP. Supported formats include:</p>

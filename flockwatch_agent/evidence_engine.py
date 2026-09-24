@@ -32,41 +32,56 @@ def determine_confidence_tier(
     observations: list[EvidenceObservation],
     public_corroboration: list[PublicCorroboration] = None,
     fcc_match: Optional[FCCHardwareMatch] = None,
-    human_verified: bool = False,
 ) -> tuple[ConfidenceTier, str]:
     """
     Determine confidence tier based on evidence strength.
 
-    This is deterministic — the LLM never sets the tier.
+    No manual verification required — machine_supported is the highest
+    automated tier, achievable through:
+    - Repeated observations across time
+    - Multiple RF modes (Wi-Fi + BLE + ISM)
+    - Independent public corroboration (FCC, municipal, news)
+
+    The LLM NEVER sets the tier. This is 100% deterministic.
     """
     public_corroboration = public_corroboration or []
-
-    if human_verified:
-        return (
-            ConfidenceTier.VERIFIED,
-            "Human-verified location with repeated observations"
-        )
 
     # Collect all detection methods across observations
     all_methods = set()
     source_devices = set()
+    radio_types = set()
+    timestamps = set()
+
     for obs in observations:
         all_methods.update(obs.detection_methods)
         source_devices.add(obs.source_device)
+        if obs.radio_type:
+            radio_types.add(obs.radio_type.value if hasattr(obs.radio_type, 'value') else str(obs.radio_type))
+        timestamps.add(obs.timestamp.date().isoformat() if obs.timestamp else None)
 
     # Count distinct passive detection methods
     passive_methods = all_methods - {DetectionMethod.CROSS_SOURCE}
     distinct_passive = len(passive_methods)
     distinct_sources = len(source_devices)
+    distinct_radio_types = len(radio_types)
+    distinct_days = len([t for t in timestamps if t])  # Repeated across multiple days
 
     # Count independent public evidence sources
     public_sources = [s for s in public_corroboration if s.source_type != PublicSourceType.WIGLE]
-    # WiGLE is crowdsourced passive — not fully "independent public evidence"
-    wigle_sources = [s for s in public_corroboration if s.source_type == PublicSourceType.WIGLE]
     has_public_evidence = len(public_sources) > 0
 
     # FCC hardware match is corroboration of hardware, not location
     fcc_corroborates_hardware = fcc_match is not None and fcc_match.confidence in ("medium", "high")
+
+    # TIER: MACHINE_SUPPORTED — highest automated tier
+    # Requires: repeated observations (2+ days) + multiple RF modes + public corroboration
+    if distinct_days >= 2 and distinct_radio_types >= 2 and has_public_evidence and distinct_passive >= 2:
+        return (
+            ConfidenceTier.MACHINE_SUPPORTED,
+            f"Repeated automated observations across {distinct_days} day(s) using {distinct_radio_types} radio type(s) "
+            f"({distinct_passive} detection methods), corroborated by {len(public_sources)} independent public source(s). "
+            f"No manual verification required."
+        )
 
     # TIER: SUPPORTED — passive + independent public evidence
     if has_public_evidence and distinct_passive >= 2:
@@ -94,11 +109,11 @@ def determine_confidence_tier(
             f"({', '.join(method_names)}), {distinct_sources} source device(s)"
         )
 
-    # TIER: PROBABLE — single method but repeated observations at same location
-    if len(observations) >= 3 and distinct_sources >= 2:
+    # TIER: PROBABLE — single method but repeated observations across time
+    if len(observations) >= 3 and distinct_days >= 2:
         return (
             ConfidenceTier.PROBABLE,
-            f"Repeated observations ({len(observations)} times) from {distinct_sources} source(s) at same location"
+            f"Repeated observations ({len(observations)} times across {distinct_days} day(s)) at same location"
         )
 
     # TIER: UNCONFIRMED — single weak indicator
@@ -151,14 +166,11 @@ def build_evidence_report(
     observations: list[EvidenceObservation],
     public_corroboration: list[PublicCorroboration] = None,
     fcc_match: Optional[FCCHardwareMatch] = None,
-    human_verified: bool = False,
     location: Optional[EvidenceLocation] = None,
 ) -> EvidenceReport:
     """
     Build a complete evidence report from observations and public data.
-
-    This is the main entry point — takes raw evidence and produces
-    the structured Corpora output.
+    No manual verification required — the highest tier is machine_supported.
     """
     public_corroboration = public_corroboration or []
 
@@ -212,9 +224,9 @@ def build_evidence_report(
     first_observed = min(timestamps) if timestamps else None
     last_observed = max(timestamps) if timestamps else None
 
-    # Determine confidence
+    # Determine confidence (no manual verification required)
     tier, explanation = determine_confidence_tier(
-        primary, public_corroboration, fcc_match, human_verified
+        primary, public_corroboration, fcc_match
     )
 
     return EvidenceReport(

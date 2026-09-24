@@ -22,11 +22,13 @@ from pydantic import BaseModel, Field
 
 
 class ConfidenceTier(str, Enum):
-    """4-tier confidence system — deterministic, never set by LLM."""
+    """4-tier confidence system — deterministic, never set by LLM.
+    No manual verification required — machine_supported is the highest
+    automated tier, achievable through repeated observations + public corroboration."""
     UNCONFIRMED = "unconfirmed"
     PROBABLE = "probable"
     SUPPORTED = "supported"
-    VERIFIED = "verified"
+    MACHINE_SUPPORTED = "machine_supported"
 
     @property
     def display_name(self) -> str:
@@ -34,12 +36,12 @@ class ConfidenceTier(str, Enum):
             "unconfirmed": "Unconfirmed — one weak indicator, may be false positive",
             "probable": "Probable — multiple independent passive indicators",
             "supported": "Supported — passive detection + independent public evidence",
-            "verified": "Verified — repeated observations / human confirmation",
+            "machine_supported": "Machine-supported — repeated automated observations + public corroboration",
         }[self.value]
 
     @property
     def numeric(self) -> int:
-        return {"unconfirmed": 1, "probable": 2, "supported": 3, "verified": 4}[self.value]
+        return {"unconfirmed": 1, "probable": 2, "supported": 3, "machine_supported": 4}[self.value]
 
 
 class RadioType(str, Enum):

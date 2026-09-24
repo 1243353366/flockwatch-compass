@@ -17,7 +17,7 @@ import urllib.parse
 from typing import Optional
 from datetime import datetime, timezone
 
-from .evidence_schema import FCCHardwareMatch, PublicCorroboration, PublicSourceType
+from ..evidence_schema import FCCHardwareMatch, PublicCorroboration, PublicSourceType
 
 # FCC Equipment Authorization Search API
 FCC_EA_SEARCH_URL = "https://apps.fcc.gov/oetcf/eas/reports/GenericSearch.cfm"

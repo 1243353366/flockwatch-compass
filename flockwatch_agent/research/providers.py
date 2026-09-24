@@ -17,7 +17,7 @@ import json
 import urllib.request
 import urllib.parse
 
-from .evidence_schema import PublicCorroboration, PublicSourceType
+from ..evidence_schema import PublicCorroboration, PublicSourceType
 
 
 def search_wigle_area(

@@ -39,6 +39,7 @@ function runPythonPipeline(observations, options = {}) {
 import json, sys
 sys.path.insert(0, "${ROOT}")
 from flockwatch_agent.research_agent import normalize_flockwatch_observation, run_research_pipeline
+from flockwatch_agent.scanner import generate_scan_config
 
 observations = json.load(open("${inputFile}"))
 evidence_obs = [normalize_flockwatch_observation(o) for o in observations]
@@ -47,7 +48,6 @@ report = run_research_pipeline(
     evidence_obs,
     city=${options.city ? `"${options.city}"` : "None"},
     state=${options.state ? `"${options.state}"` : "None"},
-    human_verified=${options.humanVerified ? "True" : "False"},
     skip_public_lookup=${options.skipPublicLookup ? "True" : "False"},
 )
 
@@ -57,10 +57,20 @@ if ${options.wantNarrative ? "True" : "False"}:
     from flockwatch_agent.research_agent import generate_ai_narrative_prompt
     ai_prompt = generate_ai_narrative_prompt(report)
 
+# Generate scan config for continued monitoring
+scan_config = generate_scan_config(
+    include_wifi=True,
+    include_ble=True,
+    include_ism=True,
+    include_5ghz=False,
+    duration_seconds=60,
+)
+
 result = {
     "report": json.loads(report.model_dump_json()),
     "report_text": report.to_text(),
     "ai_prompt": ai_prompt,
+    "scan_config": scan_config,
     "session_id": "${sessionId}",
 }
 print(json.dumps(result, default=str))
