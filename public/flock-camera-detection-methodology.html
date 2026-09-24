@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Detection Methodology — Confidence Tiers & Evidence Chains | FlockWatch Compass</title>
+  <meta name="description" content="How FlockWatch Compass classifies detections: 4-tier confidence model (Candidate, Probable, Corroborated, Verified), evidence chains, and why the LLM never decides a camera exists.">
+  <meta name="keywords" content="flock detection methodology, confidence scoring, evidence chain, ALPR confidence, RF OSINT methodology, FlockWatch">
+  <meta property="og:title" content="Flock Camera Detection Methodology">
+  <meta property="og:description" content="Deterministic 4-tier confidence model for Flock camera detection. Evidence chains, not LLM guesses.">
+  <meta property="og:type" content="article">
+  <link rel="canonical" href="https://flockwatch-compass.onrender.com/flock-camera-detection-methodology">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "Flock Camera Detection Methodology — Confidence Tiers and Evidence Chains",
+    "description": "Deterministic 4-tier confidence model for passive Flock camera detection with auditable evidence chains.",
+    "author": { "@type": "Organization", "name": "FlockWatch Compass" },
+    "datePublished": "2026-09-23",
+    "dateModified": "2026-09-23"
+  }
+  </script>
+  <link rel="stylesheet" href="/styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="header">
+    <div class="header-content">
+      <div class="logo">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="2"/>
+          <circle cx="16" cy="16" r="6" stroke="currentColor" stroke-width="2"/>
+          <circle cx="16" cy="16" r="2" fill="currentColor"/>
+        </svg>
+        <div>
+          <h1>FlockWatch Compass</h1>
+          <p class="tagline">RF OSINT Correlation System</p>
+        </div>
+      </div>
+      <nav class="nav-links">
+        <a href="/">Home</a>
+        <a href="/flock-camera-detection">Detection</a>
+        <a href="/flock-camera-detection-methodology">Methodology</a>
+        <a href="/flock-camera-rf-signatures">RF Signatures</a>
+        <a href="/flockwatch-research">Research</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="main">
+    <article class="card">
+      <h1>Detection Methodology — Confidence Tiers and Evidence Chains</h1>
+      <p class="description">FlockWatch Compass uses a deterministic, auditable confidence model. The LLM explains evidence — it never decides whether a camera exists.</p>
+
+      <h2>The Core Principle</h2>
+      <p>The biggest problem with community surveillance maps is false positives becoming permanent facts. A single OUI match or SSID pattern is not definitive — Flock's wireless behavior changes, and other devices can share similar signatures. FlockWatch Compass addresses this by requiring multiple independent indicators and separating "possible" from "confirmed."</p>
+
+      <h2>4-Tier Confidence Model</h2>
+      <p>Every detection is assigned a confidence tier by deterministic code — not by an AI. The tier is based on the number and independence of evidence sources:</p>
+
+      <table class="tier-table">
+        <thead>
+          <tr><th>Tier</th><th>Requirements</th><th>Meaning</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="tier-badge tier-candidate">Candidate</span></td>
+            <td>One weak indicator (e.g., single OUI match)</td>
+            <td>May be a false positive. Insufficient for action.</td>
+          </tr>
+          <tr>
+            <td><span class="tier-badge tier-probable">Probable</span></td>
+            <td>Multiple independent passive indicators, or repeated observations from different sources</td>
+            <td>Warrants further investigation. Collect more data.</td>
+          </tr>
+          <tr>
+            <td><span class="tier-badge tier-corroborated">Supported</span></td>
+            <td>Passive detection + independent public evidence (FCC, municipal, news)</td>
+            <td>Strong evidence. Consider field verification.</td>
+          </tr>
+          <tr>
+            <td><span class="tier-badge tier-verified">Verified</span></td>
+            <td>Human confirmation or repeated verified observations</td>
+            <td>Confirmed location. Suitable for mapping.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Evidence Chain Pattern</h2>
+      <p>Every detection lead follows an auditable evidence chain adapted from <a href="/flockwatch-research">Project Compass's decision-support framework</a>:</p>
+      <pre class="evidence-flow">Evidence → Interpretation → Recommendation → Action → Owner → Dependency → Success criterion</pre>
+      <p>This ensures every finding is traceable. You can see exactly what evidence supported a detection, how it was interpreted, what was recommended, and what success looks like.</p>
+
+      <h2>Detection Methods</h2>
+      <p>FlockWatch Compass uses multiple detection methods, each contributing to the evidence:</p>
+      <ul>
+        <li><strong>OUI prefix matching</strong> — MAC address vendor prefixes compared against known Flock Safety OUIs</li>
+        <li><strong>SSID pattern matching</strong> — Wi-Fi network names checked against Flock naming patterns</li>
+        <li><strong>BLE service UUIDs</strong> — Bluetooth service identifiers compared against known Flock UUIDs</li>
+        <li><strong>BLE manufacturer ID</strong> — Bluetooth SIG manufacturer IDs for Flock's module suppliers</li>
+        <li><strong>Wi-Fi probe/IE fingerprinting</strong> — Information element sequences in probe requests create device-specific fingerprints</li>
+        <li><strong>RF spectral fingerprinting</strong> — SDR I/Q captures compared against reference templates using cosine similarity</li>
+        <li><strong>Burst timing analysis</strong> — Transmission interval patterns (regular beacons vs. irregular traffic)</li>
+        <li><strong>Cross-source corroboration</strong> — Multiple source devices detecting the same location</li>
+      </ul>
+
+      <h2>Why Not Let the AI Decide?</h2>
+      <p>LLMs can hallucinate. They can pattern-match on insufficient evidence and confidently assert things that are wrong. In surveillance mapping, a false positive can mislead communities, waste resources, and erode trust. FlockWatch Compass keeps the AI in an explanatory role — it can summarize evidence, suggest next steps, and write reports — but the confidence tier is computed by deterministic code that anyone can inspect.</p>
+
+      <h2>Observation Schema</h2>
+      <p>Each observation from the detector is a structured record:</p>
+      <pre class="schema-block">Observation
+├── GPS coordinates + accuracy
+├── Timestamp (ISO 8601)
+├── RSSI (signal strength)
+├── Radio type (Wi-Fi / BLE / sub-GHz / SDR)
+├── MAC address + OUI prefix
+├── SSID (if Wi-Fi)
+├── BLE name, service UUIDs, manufacturer ID
+├── Probe/IE fingerprint (if available)
+├── RF fingerprint (PSD, bursts, timing)
+├── Detection methods triggered
+├── Source device (ESP32, Flipper, SDR, WiGLE)
+└── Raw payload hash (SHA-256 for integrity)</pre>
+
+      <h2>Related Pages</h2>
+      <ul>
+        <li><a href="/flock-camera-detection">Flock Camera Detection</a> — overview of detection modalities</li>
+        <li><a href="/flock-camera-rf-signatures">RF Signatures</a> — SDR fingerprinting and spectral analysis</li>
+        <li><a href="/flockwatch-research">Research</a> — OSINT workflow and public data sources</li>
+      </ul>
+    </article>
+  </main>
+
+  <footer class="footer">
+    <p>FlockWatch Compass — Passive detection only. Confidence tiers are deterministic, not AI-assessed.</p>
+  </footer>
+</body>
+</html>

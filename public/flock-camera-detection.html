@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flock Camera Detection — Passive RF OSINT | FlockWatch Compass</title>
+  <meta name="description" content="Passive detection methodology for Flock Safety ALPR cameras using Wi-Fi, BLE, and SDR. Multi-source evidence correlation with FCC database lookups. No active probing.">
+  <meta name="keywords" content="flock camera detection, ALPR detection, RF fingerprinting, WiGLE, ESP32, SDR, passive surveillance detection, Flock Safety">
+  <meta property="og:title" content="Flock Camera Detection — Passive RF OSINT">
+  <meta property="og:description" content="Multi-source passive detection of Flock Safety ALPR cameras using Wi-Fi/BLE scanning, SDR I/Q analysis, and FCC database correlation.">
+  <meta property="og:type" content="website">
+  <link rel="canonical" href="https://flockwatch-compass.onrender.com/flock-camera-detection">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "Flock Camera Detection via Passive RF OSINT",
+    "description": "Passive detection methodology for Flock Safety ALPR cameras using Wi-Fi, BLE, SDR, and FCC database correlation.",
+    "author": { "@type": "Organization", "name": "FlockWatch Compass" },
+    "datePublished": "2026-09-23",
+    "dateModified": "2026-09-23",
+    "about": ["Flock Safety", "ALPR", "RF fingerprinting", "WiGLE", "SDR", "FCC equipment authorization"]
+  }
+  </script>
+  <link rel="stylesheet" href="/styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="header">
+    <div class="header-content">
+      <div class="logo">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="2"/>
+          <circle cx="16" cy="16" r="6" stroke="currentColor" stroke-width="2"/>
+          <circle cx="16" cy="16" r="2" fill="currentColor"/>
+        </svg>
+        <div>
+          <h1>FlockWatch Compass</h1>
+          <p class="tagline">RF OSINT Correlation System</p>
+        </div>
+      </div>
+      <nav class="nav-links">
+        <a href="/">Home</a>
+        <a href="/flock-camera-detection">Detection</a>
+        <a href="/flock-camera-detection-methodology">Methodology</a>
+        <a href="/flock-camera-rf-signatures">RF Signatures</a>
+        <a href="/flockwatch-research">Research</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="main">
+    <article class="card">
+      <h1>Flock Camera Detection via Passive RF OSINT</h1>
+      <p class="description">FlockWatch Compass detects Flock Safety ALPR cameras using passive radio frequency observation and open-source intelligence correlation. No active probing, jamming, or device access.</p>
+
+      <h2>How Detection Works</h2>
+      <p>Flock Safety cameras and their supporting infrastructure emit radio signals across multiple bands — Wi-Fi (2.4 GHz, 5 GHz), Bluetooth Low Energy (BLE), and sometimes sub-GHz ISM band transmissions. FlockWatch Compass passively observes these emissions using commodity hardware and correlates them against known device signatures.</p>
+
+      <p>The system combines four independent detection modalities:</p>
+
+      <h3>Wi-Fi Scanning</h3>
+      <p>ESP32-based devices scan for Wi-Fi networks with OUI prefixes and SSID patterns matching Flock hardware. WiGLE crowd-sourced data provides historical corroboration. This catches devices that broadcast identifying information in their Wi-Fi beacons.</p>
+
+      <h3>BLE Detection</h3>
+      <p>Bluetooth Low Energy advertisements contain service UUIDs, device names, and manufacturer IDs that can identify Flock hardware. ESP32 modules scan for BLE advertisements matching known Flock signatures.</p>
+
+      <h3>SDR I/Q Analysis</h3>
+      <p>Software-defined radio captures raw I/Q samples and extracts spectral fingerprints — power spectral density, burst timing patterns, and dominant frequency peaks. These are compared against reference templates using cosine similarity. See <a href="/flock-camera-rf-signatures">RF signatures</a> for details.</p>
+
+      <h3>Flipper Zero Sub-GHz</h3>
+      <p>Flipper Zero captures sub-1 GHz transmissions, which some Flock devices use for backhaul or node-to-node communication. Protocol analysis and timing pattern detection identify bursty transmissions characteristic of ALPR infrastructure.</p>
+
+      <h2>Multi-Source Evidence Correlation</h2>
+      <p>Single-indicator detections are unreliable — Flock's wireless behavior has changed over time, and relying on one signature (like an OUI prefix) can miss cameras or produce false positives. FlockWatch Compass correlates evidence from multiple independent sources before classifying a detection.</p>
+
+      <p>The system uses a <a href="/flock-camera-detection-methodology">4-tier confidence model</a> — Candidate, Probable, Corroborated, and Verified — that is computed deterministically. An AI assistant may explain the evidence in plain language, but the LLM never decides whether a camera exists.</p>
+
+      <h2>Public Data Correlation</h2>
+      <p>RF observations are correlated against public databases:</p>
+      <ul>
+        <li><strong>FCC Equipment Authorization</strong> — FCC IDs, manufacturers, and authorized frequencies from the Commission's public database. FCC records corroborate hardware plausibility, not physical location.</li>
+        <li><strong>FCC ULS</strong> — Universal Licensing System data identifies nearby licensed transmitters. Part 15 unlicensed devices (Wi-Fi/BLE) typically do not appear in ULS, making this useful as negative evidence.</li>
+        <li><strong>WiGLE</strong> — Crowd-sourced Wi-Fi observations provide historical corroboration from independent wardrivers.</li>
+        <li><strong>Municipal records</strong> — Procurement contracts, city council minutes, and public safety department acquisitions.</li>
+        <li><strong>OpenStreetMap</strong> — Infrastructure context (road types, utility poles, nearby public safety facilities) for locational plausibility.</li>
+      </ul>
+
+      <h2>Legal and Safety</h2>
+      <p>FlockWatch Compass is strictly passive. It does not send packets, transmit signals, jam frequencies, deauthenticate devices, or access any device. All data is user-provided from lawful captures and public datasets. FCC equipment authorization data is public by law. See the <a href="/flockwatch-research">research page</a> for the full OSINT workflow.</p>
+    </article>
+  </main>
+
+  <footer class="footer">
+    <p>FlockWatch Compass — Passive detection only. All findings require lawful verification.</p>
+  </footer>
+</body>
+</html>

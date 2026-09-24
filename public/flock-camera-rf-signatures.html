@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flock Camera RF Signatures — SDR Fingerprinting & Spectral Analysis | FlockWatch Compass</title>
+  <meta name="description" content="Radio frequency fingerprinting of Flock Safety cameras: power spectral density, burst timing, Wi-Fi probe/IE fingerprints, and FCC equipment authorization lookups.">
+  <meta name="keywords" content="RF fingerprinting, SDR, I/Q capture, spectral analysis, Flock camera signatures, Wi-Fi probe fingerprint, FCC equipment authorization, RTL-SDR">
+  <meta property="og:title" content="Flock Camera RF Signatures — SDR Fingerprinting">
+  <meta property="og:description" content="How FlockWatch Compass extracts RF fingerprints from SDR I/Q captures and matches them against known Flock device templates.">
+  <meta property="og:type" content="article">
+  <link rel="canonical" href="https://flockwatch-compass.onrender.com/flock-camera-rf-signatures">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "Flock Camera RF Signatures — SDR Fingerprinting and Spectral Analysis",
+    "description": "Radio frequency fingerprinting methodology for Flock Safety ALPR cameras using SDR I/Q captures, PSD, burst timing, and FCC equipment authorization correlation.",
+    "author": { "@type": "Organization", "name": "FlockWatch Compass" },
+    "datePublished": "2026-09-23",
+    "dateModified": "2026-09-23",
+    "about": ["RF fingerprinting", "SDR", "power spectral density", "FCC equipment authorization", "Wi-Fi probe fingerprinting"]
+  }
+  </script>
+  <link rel="stylesheet" href="/styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="header">
+    <div class="header-content">
+      <div class="logo">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="2"/>
+          <circle cx="16" cy="16" r="6" stroke="currentColor" stroke-width="2"/>
+          <circle cx="16" cy="16" r="2" fill="currentColor"/>
+        </svg>
+        <div>
+          <h1>FlockWatch Compass</h1>
+          <p class="tagline">RF OSINT Correlation System</p>
+        </div>
+      </div>
+      <nav class="nav-links">
+        <a href="/">Home</a>
+        <a href="/flock-camera-detection">Detection</a>
+        <a href="/flock-camera-detection-methodology">Methodology</a>
+        <a href="/flock-camera-rf-signatures">RF Signatures</a>
+        <a href="/flockwatch-research">Research</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="main">
+    <article class="card">
+      <h1>Flock Camera RF Signatures — SDR Fingerprinting</h1>
+      <p class="description">FlockWatch Compass extracts radio frequency fingerprints from SDR I/Q captures and correlates them with FCC equipment authorization records. This page details the technical methodology.</p>
+
+      <h2>What Is RF Fingerprinting?</h2>
+      <p>Every radio transmitter has subtle hardware imperfections — oscillator drift, filter responses, amplifier nonlinearities — that create a unique spectral signature. Even two devices of the same model produce slightly different RF fingerprints. FlockWatch Compass captures these fingerprints using software-defined radio and compares them against reference templates.</p>
+
+      <h2>I/Q Capture Format</h2>
+      <p>The system accepts raw I/Q (in-phase / quadrature) samples from any SDR — RTL-SDR, HackRF, LimeSDR, or USRP. Supported formats include:</p>
+      <ul>
+        <li><strong>Interleaved int16</strong> — RTL-SDR default format (I, Q, I, Q, ...)</li>
+        <li><strong>Complex float32</strong> — GNU Radio format</li>
+        <li><strong>Complex64 (numpy)</strong> — Direct complex samples</li>
+      </ul>
+
+      <h2>Feature Extraction</h2>
+      <p>From each I/Q capture, FlockWatch Compass extracts four categories of features:</p>
+
+      <h3>Power Spectral Density (PSD)</h3>
+      <p>Uses Welch's method to compute an averaged PSD. The FFT is divided into 64 frequency bins, providing a compact spectral fingerprint. This captures the overall power distribution across the device's transmission bandwidth.</p>
+
+      <h3>Spectral Peaks</h3>
+      <p>Dominant frequency components are identified using a prominence-based peak detector. Peaks above the noise floor by 3 dB or more are recorded with their frequency and power. These reveal characteristic transmission modes — beacons have narrow peaks, while data transmissions spread power across the band.</p>
+
+      <h3>Burst Timing</h3>
+      <p>An energy detector identifies transmission bursts — segments where instantaneous power exceeds an adaptive threshold. Inter-burst intervals are measured in milliseconds. Regular periodic patterns (low coefficient of variation) indicate beaconing devices, which is characteristic of ALPR camera infrastructure.</p>
+
+      <h3>Template Matching</h3>
+      <p>Extracted PSD feature vectors are compared against reference templates using cosine similarity. Templates are stored in editable YAML files, allowing the community to expand the reference library. A similarity score above 0.7 is considered a strong match.</p>
+
+      <h2>Wi-Fi Probe/IE Fingerprinting</h2>
+      <p>Beyond spectral analysis, FlockWatch Compass captures Wi-Fi probe request fingerprints — the sequence of Information Elements (IEs) a device includes in its probe requests. This creates a device-specific fingerprint that can distinguish hardware even when MAC addresses are randomized or spoofed. The IE sequence is hashed (SHA-256) for compact comparison.</p>
+
+      <h2>FCC Equipment Authorization Correlation</h2>
+      <p>When an RF fingerprint is matched, FlockWatch Compass looks up the FCC equipment authorization database to corroborate the hardware. The FCC's Office of Engineering and Technology (OET) maintains a public database of equipment authorizations including:</p>
+      <ul>
+        <li>FCC ID numbers</li>
+        <li>Applicant (manufacturer) names</li>
+        <li>Equipment classes (Digital Transmission System, Spread Spectrum, etc.)</li>
+        <li>Authorized frequency ranges</li>
+        <li>Grant dates</li>
+      </ul>
+
+      <p><strong>Important caveat:</strong> FCC records corroborate hardware plausibility — they confirm that a manufacturer has authorization for equipment operating on the observed frequencies. They do NOT prove a physical camera is at a specific location. Part 15 unlicensed devices (Wi-Fi, BLE) typically do not appear in the FCC's Universal Licensing System (ULS), which covers licensed services.</p>
+
+      <h2>Known Flock Safety FCC Records</h2>
+      <p>FlockWatch Compass includes pre-identified FCC equipment authorization records for Flock Safety Inc. These are public records — FCC grants of equipment authorization are available through the Commission's public database. They include FCC IDs, applicant names, equipment classes, and authorized frequency ranges.</p>
+
+      <h2>RF Signature Limitations</h2>
+      <p>RF fingerprinting is not a silver bullet:</p>
+      <ul>
+        <li>Environmental factors (multipath, interference) affect captured signatures</li>
+        <li>Reference templates are only as good as the verified captures used to create them</li>
+        <li>Flock may update firmware that changes wireless behavior</li>
+        <li>Single-source RF matches should be treated as <a href="/flock-camera-detection-methodology">Candidate-level</a> evidence, not confirmation</li>
+      </ul>
+
+      <h2>Related Pages</h2>
+      <ul>
+        <li><a href="/flock-camera-detection">Flock Camera Detection</a> — overview of all detection modalities</li>
+        <li><a href="/flock-camera-detection-methodology">Methodology</a> — confidence tiers and evidence chains</li>
+        <li><a href="/flockwatch-research">Research</a> — OSINT workflow and public data sources</li>
+      </ul>
+    </article>
+  </main>
+
+  <footer class="footer">
+    <p>FlockWatch Compass — FCC records corroborate hardware, not physical location. All findings require lawful verification.</p>
+  </footer>
+</body>
+</html>

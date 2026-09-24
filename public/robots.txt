@@ -1,0 +1,9 @@
+# FlockWatch Compass — robots.txt
+# RF OSINT correlation system for passive Flock camera detection
+
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /data/
+
+Sitemap: https://flockwatch-compass.onrender.com/sitemap.xml

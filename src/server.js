@@ -1,19 +1,25 @@
 /**
- * FlockWatch Compass Server
+ * FlockWatch Compass Server v2
  *
- * Combines Project Compass's server architecture with FlockWatch's detection
- * engine and an agentic AI reasoning layer.
+ * RF OSINT correlation system. Corpora AI is the research layer,
+ * FlockWatch is the evidence/detection layer. The LLM NEVER decides
+ * a camera exists — it explains evidence.
+ *
+ * API:
+ *   POST /api/research       — Run full research pipeline on observations
+ *   POST /api/near-me        — "What's near me?" search by location
+ *   GET  /api/coverage       — US coverage analysis
+ *   GET  /api/request-token  — Get one-time request token
+ *   GET  /health             — Health check
  */
 
 import { createServer } from "node:http";
 import { randomBytes, randomUUID } from "node:crypto";
-import { readFile, writeFile, mkdir, readdir } from "node:fs/promises";
-import { existsSync, readFileSync } from "node:fs";
+import { readFile, mkdir, readdir } from "node:fs/promises";
+import { existsSync, readFileSync, mkdirSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
-import { runAgentAnalysis } from "./flock-agent-engine.js";
-import { generateNarrative } from "./ai-narrative.js";
-import { ingestFile, scoreObservations, listSignatures } from "./flockwatch-runner.js";
+import { runResearchAgent, whatsNearMe } from "./research-agent.js";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const ROOT = join(__dirname, "..");
@@ -24,10 +30,9 @@ const MAX_BODY_BYTES = 10 * 1024 * 1024;
 const RATE_LIMIT = 30;
 const RATE_WINDOW_MS = 60_000;
 const REQUEST_TOKEN_TTL_MS = 10 * 60_000;
-const MAX_CONCURRENT_ANALYSES = 4;
 const DATA_DIR = join(ROOT, "data", "sessions");
 
-await mkdir(DATA_DIR, { recursive: true }).catch(() => {});
+mkdirSync(DATA_DIR, { recursive: true });
 
 const MIME_TYPES = Object.freeze({
   ".html": "text/html; charset=utf-8",
@@ -35,8 +40,6 @@ const MIME_TYPES = Object.freeze({
   ".js": "application/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
-  ".png": "image/png",
-  ".ico": "image/x-icon",
 });
 
 function securityHeaders(extra = {}) {
@@ -44,42 +47,39 @@ function securityHeaders(extra = {}) {
     "x-content-type-options": "nosniff",
     "x-frame-options": "DENY",
     "referrer-policy": "strict-origin-when-cross-origin",
-    "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=()",
+    "permissions-policy": "geolocation=self",  // Allow geolocation for "what's near me"
     "strict-transport-security": "max-age=31536000; includeSubDomains",
     "cross-origin-opener-policy": "same-origin",
-    "cross-origin-resource-policy": "same-origin",
-    "x-dns-prefetch-control": "off",
     "content-security-policy": "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; font-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
     ...extra,
   };
 }
 
-function sendJson(response, data, status = 200) {
-  response.writeHead(status, securityHeaders({
+function sendJson(res, data, status = 200) {
+  res.writeHead(status, securityHeaders({
     "content-type": "application/json; charset=utf-8",
     "cache-control": "no-store",
-    "x-request-id": response.requestId || "unavailable",
+    "x-request-id": res.requestId || "unavailable",
   }));
-  response.end(JSON.stringify(data));
+  res.end(JSON.stringify(data));
 }
 
-function getClientIp(request) {
-  const forwarded = String(request.headers["x-forwarded-for"] || "").split(",")[0].trim();
-  return forwarded || request.socket.remoteAddress || "unknown";
+function getClientIp(req) {
+  const fwd = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
+  return fwd || req.socket.remoteAddress || "unknown";
 }
 
 const hits = new Map();
 const requestTokens = new Map();
-let activeAnalyses = 0;
 
-function rateLimited(request) {
-  const key = getClientIp(request);
+function rateLimited(req) {
+  const key = getClientIp(req);
   const now = Date.now();
   let record = hits.get(key);
   if (!record || now - record.startedAt > RATE_WINDOW_MS) record = { startedAt: now, count: 0 };
   record.count += 1;
   hits.set(key, record);
-  if (hits.size > 5_000) hits.clear();
+  if (hits.size > 5000) hits.clear();
   return record.count > RATE_LIMIT;
 }
 
@@ -88,8 +88,8 @@ function issueToken() {
   requestTokens.set(token, { issued: Date.now() });
   if (requestTokens.size > 1000) {
     const now = Date.now();
-    for (const [key, val] of requestTokens) {
-      if (now - val.issued > REQUEST_TOKEN_TTL_MS) requestTokens.delete(key);
+    for (const [k, v] of requestTokens) {
+      if (now - v.issued > REQUEST_TOKEN_TTL_MS) requestTokens.delete(k);
     }
   }
   return token;
@@ -107,205 +107,204 @@ function validateToken(token) {
   return true;
 }
 
-function readBody(request, maxBytes = MAX_BODY_BYTES) {
+function readBody(req, maxBytes = MAX_BODY_BYTES) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     let total = 0;
-    request.on("data", (chunk) => {
+    req.on("data", (chunk) => {
       total += chunk.length;
-      if (total > maxBytes) { reject(new Error("Request body too large")); request.destroy(); return; }
+      if (total > maxBytes) { reject(new Error("Body too large")); req.destroy(); return; }
       chunks.push(chunk);
     });
-    request.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
-    request.on("error", reject);
+    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
+    req.on("error", reject);
   });
 }
 
-async function readBodyJson(request) {
-  const body = await readBody(request);
-  try { return JSON.parse(body); } catch { throw new Error("Invalid JSON body"); }
+async function readBodyJson(req) {
+  const body = await readBody(req);
+  try { return JSON.parse(body); } catch { throw new Error("Invalid JSON"); }
 }
 
-async function handleAnalyze(request, response) {
-  if (activeAnalyses >= MAX_CONCURRENT_ANALYSES) {
-    return sendJson(response, { error: "Too many concurrent analyses. Please retry." }, 503);
+// ─── Handlers ────────────────────────────────────────────────────────────────
+async function handleResearch(req, res) {
+  const body = await readBodyJson(req);
+  const { observations, city, state, humanVerified, wantNarrative, skipPublicLookup } = body;
+
+  if (!Array.isArray(observations)) {
+    return sendJson(res, { error: "observations must be an array" }, 400);
   }
-  activeAnalyses++;
-  try {
-    const body = await readBodyJson(request);
-    const { observations, threshold, maxResults, includeCoverageGaps, generateNarrative: wantNarrative } = body;
 
-    if (!Array.isArray(observations)) return sendJson(response, { error: "observations must be an array" }, 400);
+  const result = await runResearchAgent(observations, {
+    city, state,
+    humanVerified: humanVerified || false,
+    wantNarrative: wantNarrative || false,
+    skipPublicLookup: skipPublicLookup || false,
+  });
 
-    const analysis = runAgentAnalysis(observations, {
-      threshold: threshold || 0.3,
-      maxResults: maxResults || 50,
-      includeCoverageGaps: includeCoverageGaps !== false,
-    });
-
-    if (wantNarrative) {
-      analysis.narrative = await generateNarrative(analysis);
-    }
-
-    sendJson(response, analysis);
-  } catch (error) {
-    sendJson(response, { error: error.message }, 500);
-  } finally {
-    activeAnalyses--;
-  }
+  sendJson(res, result);
 }
 
-async function handleIngest(request, response) {
-  try {
-    const body = await readBodyJson(request);
-    const { type, file_path, session_id } = body;
-    if (!type || !file_path) return sendJson(response, { error: "type and file_path are required" }, 400);
+async function handleNearMe(req, res) {
+  const body = await readBodyJson(req);
+  const { lat, lon, radiusM, city, state, wantNarrative } = body;
 
-    const sessionId = session_id || randomUUID();
-    const sessionDir = join(DATA_DIR, sessionId);
-    await mkdir(sessionDir, { recursive: true });
-    const outputFile = join(sessionDir, "observations.jsonl");
-
-    const result = await ingestFile(type, file_path, { output: outputFile, append: existsSync(outputFile) });
-    sendJson(response, { ...result, session_id: sessionId });
-  } catch (error) {
-    sendJson(response, { error: error.message }, 500);
+  if (typeof lat !== "number" || typeof lon !== "number") {
+    return sendJson(res, { error: "lat and lon are required as numbers" }, 400);
   }
+
+  const result = await whatsNearMe(lat, lon, {
+    radiusM: radiusM || 500,
+    city, state,
+    wantNarrative: wantNarrative || false,
+  });
+
+  sendJson(res, result);
 }
 
-async function handleScore(request, response) {
-  try {
-    const body = await readBodyJson(request);
-    const { session_id, threshold } = body;
-    if (!session_id) return sendJson(response, { error: "session_id is required" }, 400);
-
-    const inputFile = join(DATA_DIR, session_id, "observations.jsonl");
-    const outputFile = join(DATA_DIR, session_id, "scored.jsonl");
-    if (!existsSync(inputFile)) return sendJson(response, { error: "No observations found for session" }, 404);
-
-    const observations = await scoreObservations(inputFile, outputFile, threshold || 0.5);
-    sendJson(response, { session_id, total_observations: observations.length, scored_file: outputFile });
-  } catch (error) {
-    sendJson(response, { error: error.message }, 500);
-  }
-}
-
-async function handleCoverage(request, response) {
-  try {
-    const observations = [];
-    const sessions = await readdir(DATA_DIR).catch(() => []);
-    for (const session of sessions) {
-      const scoredFile = join(DATA_DIR, session, "scored.jsonl");
-      if (existsSync(scoredFile)) {
-        const content = readFileSync(scoredFile, "utf-8");
-        for (const line of content.split("\n")) {
-          if (line.trim()) {
-            try {
-              const parsed = JSON.parse(line);
-              observations.push(parsed.observation || parsed);
-            } catch {}
-          }
+async function handleCoverage(req, res) {
+  const observations = [];
+  const sessions = await readdir(DATA_DIR).catch(() => []);
+  for (const session of sessions) {
+    const scoredFile = join(DATA_DIR, session, "scored.jsonl");
+    if (existsSync(scoredFile)) {
+      const content = readFileSync(scoredFile, "utf-8");
+      for (const line of content.split("\n")) {
+        if (line.trim()) {
+          try {
+            const parsed = JSON.parse(line);
+            observations.push(parsed.observation || parsed);
+          } catch {}
         }
       }
     }
-    const analysis = runAgentAnalysis(observations, { includeCoverageGaps: true });
-    sendJson(response, { coverage: analysis.coverage, summary: analysis.summary });
-  } catch (error) {
-    sendJson(response, { error: error.message }, 500);
   }
+
+  // Simple coverage analysis
+  const US_BOUNDS = { minLat: 24.5, maxLat: 49.5, minLon: -125.0, maxLon: -66.5 };
+  const gridSize = 2.0;
+  const grid = {};
+  for (const obs of observations) {
+    if (!obs.location) continue;
+    if (obs.location.lat < US_BOUNDS.minLat || obs.location.lat > US_BOUNDS.maxLat) continue;
+    if (obs.location.lon < US_BOUNDS.minLon || obs.location.lon > US_BOUNDS.maxLon) continue;
+    const key = `${Math.floor(obs.location.lat / gridSize)},${Math.floor(obs.location.lon / gridSize)}`;
+    grid[key] = (grid[key] || 0) + 1;
+  }
+
+  const latCells = Math.ceil((US_BOUNDS.maxLat - US_BOUNDS.minLat) / gridSize);
+  const lonCells = Math.ceil((US_BOUNDS.maxLon - US_BOUNDS.minLon) / gridSize);
+  const totalCells = latCells * lonCells;
+  const covered = Object.keys(grid).length;
+
+  sendJson(res, {
+    coverage: {
+      total_grid_cells: totalCells,
+      covered_cells: covered,
+      coverage_percentage: Math.round((covered / totalCells) * 1000) / 10,
+      gaps: totalCells - covered,
+      note: "Coverage gaps mean no data collected — NOT confirmed absence of cameras.",
+    },
+    summary: {
+      total_observations: observations.length,
+      located: observations.filter(o => o.location).length,
+    },
+  });
 }
 
-async function handleSignatures(request, response) {
-  try {
-    const output = await listSignatures();
-    sendJson(response, { signatures: output });
-  } catch (error) {
-    sendJson(response, { error: "Python FlockWatch engine not available", detail: error.message }, 500);
-  }
-}
-
-const server = createServer(async (request, response) => {
-  response.requestId = randomUUID();
-  const url = new URL(request.url, `http://${HOST}:${PORT}`);
+// ─── Server ──────────────────────────────────────────────────────────────────
+const server = createServer(async (req, res) => {
+  res.requestId = randomUUID();
+  const url = new URL(req.url, `http://${HOST}:${PORT}`);
   const pathname = url.pathname;
 
-  if (request.method === "OPTIONS") {
-    response.writeHead(204, securityHeaders());
-    response.end();
+  if (req.method === "OPTIONS") {
+    res.writeHead(204, securityHeaders());
+    res.end();
     return;
   }
 
-  if (rateLimited(request)) return sendJson(response, { error: "Rate limit exceeded" }, 429);
+  if (rateLimited(req)) return sendJson(res, { error: "Rate limit exceeded" }, 429);
 
-  if (pathname === "/health" && request.method === "GET") {
-    return sendJson(response, {
+  if (pathname === "/health" && req.method === "GET") {
+    return sendJson(res, {
       status: "ok",
       timestamp: new Date().toISOString(),
-      active_analyses: activeAnalyses,
-      python_available: existsSync(join(ROOT, "vendor", "flockwatch", "flockwatch")),
+      python_available: existsSync(join(ROOT, "flockwatch_agent", "__init__.py")),
       ai_enabled: process.env.AI_MODE === "on",
     });
   }
 
-  if (pathname === "/api/request-token" && request.method === "GET") {
+  if (pathname === "/api/request-token" && req.method === "GET") {
     const token = issueToken();
-    response.setHeader("Set-Cookie", `request_token=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=600`);
-    return sendJson(response, { token, expires_in: REQUEST_TOKEN_TTL_MS });
+    res.setHeader("Set-Cookie", `request_token=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=600`);
+    return sendJson(res, { token, expires_in: REQUEST_TOKEN_TTL_MS });
   }
 
   if (pathname.startsWith("/api/")) {
-    const token = request.headers["x-request-token"];
-    if (!validateToken(token)) return sendJson(response, { error: "Invalid or missing request token" }, 403);
+    const token = req.headers["x-request-token"];
+    if (!validateToken(token)) return sendJson(res, { error: "Invalid or missing request token" }, 403);
 
     try {
       switch (pathname) {
-        case "/api/analyze":
-          if (request.method === "POST") return await handleAnalyze(request, response);
+        case "/api/research":
+          if (req.method === "POST") return await handleResearch(req, res);
           break;
-        case "/api/ingest":
-          if (request.method === "POST") return await handleIngest(request, response);
-          break;
-        case "/api/score":
-          if (request.method === "POST") return await handleScore(request, response);
+        case "/api/near-me":
+          if (req.method === "POST") return await handleNearMe(req, res);
           break;
         case "/api/coverage":
-          if (request.method === "GET") return await handleCoverage(request, response);
-          break;
-        case "/api/signatures":
-          if (request.method === "GET") return await handleSignatures(request, response);
+          if (req.method === "GET") return await handleCoverage(req, res);
           break;
       }
-      return sendJson(response, { error: "Endpoint not found" }, 404);
+      return sendJson(res, { error: "Endpoint not found" }, 404);
     } catch (error) {
-      return sendJson(response, { error: error.message }, 500);
+      return sendJson(res, { error: error.message || error.error || "Internal error" }, 500);
     }
   }
 
-  if (request.method === "GET") {
-    const filePath = join(PUBLIC_DIR, pathname === "/" ? "index.html" : pathname);
-    const safePath = normalize(filePath);
-    if (!safePath.startsWith(PUBLIC_DIR)) { response.writeHead(403); response.end("Forbidden"); return; }
+  if (req.method === "GET") {
+    // Clean URL handling: try exact file, then slug.html, then directory/index.html
+    let filePath = join(PUBLIC_DIR, pathname === "/" ? "index.html" : pathname);
+    let safePath = normalize(filePath);
+
+    // If no extension, try .html fallback for clean URLs
+    if (!extname(safePath) && safePath.startsWith(PUBLIC_DIR)) {
+      const htmlPath = safePath + ".html";
+      if (existsSync(htmlPath)) {
+        safePath = htmlPath;
+      } else {
+        const indexPath = join(safePath, "index.html");
+        if (existsSync(indexPath)) {
+          safePath = indexPath;
+        }
+      }
+    }
+
+    if (!safePath.startsWith(PUBLIC_DIR)) { res.writeHead(403); res.end("Forbidden"); return; }
 
     try {
       const content = await readFile(safePath);
       const ext = extname(safePath);
-      response.writeHead(200, securityHeaders({
+      res.writeHead(200, securityHeaders({
         "content-type": MIME_TYPES[ext] || "application/octet-stream",
         "cache-control": "public, max-age=300",
       }));
-      response.end(content);
+      res.end(content);
     } catch {
-      response.writeHead(404);
-      response.end("Not found");
+      res.writeHead(404);
+      res.end("Not found");
     }
     return;
   }
 
-  response.writeHead(405);
-  response.end("Method not allowed");
+  res.writeHead(405);
+  res.end("Method not allowed");
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`FlockWatch Compass server running at http://${HOST}:${PORT}`);
-  console.log(`AI narrative: ${process.env.AI_MODE === "on" ? "enabled" : "disabled (deterministic fallback)"}`);
+  console.log(`FlockWatch Compass — RF OSINT Research Agent`);
+  console.log(`Server: http://${HOST}:${PORT}`);
+  console.log(`Python agent: ${existsSync(join(ROOT, "flockwatch_agent", "__init__.py")) ? "available" : "not found"}`);
+  console.log(`AI narrative: ${process.env.AI_MODE === "on" ? "enabled" : "disabled (reports work without AI)"}`);
 });

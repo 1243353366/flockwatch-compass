@@ -277,3 +277,37 @@ input[type="checkbox"] { width: auto; }
 }
 
 pre { font-family: var(--font-mono); font-size: 12px; overflow-x: auto; }
+
+.nav-links { display: flex; gap: 16px; }
+.nav-links a { color: var(--text-dim); text-decoration: none; font-size: 13px; transition: color 0.2s; }
+.nav-links a:hover { color: var(--accent); }
+
+.tier-table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+.tier-table th, .tier-table td { padding: 10px; border: 1px solid var(--border); text-align: left; font-size: 13px; }
+.tier-table th { background: var(--bg-input); color: var(--text-dim); font-weight: 600; }
+
+.tier-badge { font-size: 11px; padding: 3px 10px; border-radius: 4px; font-family: var(--font-mono); font-weight: 600; }
+.tier-candidate { color: var(--text-dim); background: var(--bg-input); }
+.tier-probable { color: var(--warning); background: rgba(210,153,34,0.1); }
+.tier-corroborated { color: var(--accent); background: rgba(88,166,255,0.1); }
+.tier-verified { color: var(--success); background: rgba(63,185,80,0.1); }
+
+.evidence-flow, .schema-block, .report-example {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  overflow-x: auto;
+  line-height: 1.6;
+  white-space: pre;
+}
+
+article.card h1 { font-size: 24px; margin-bottom: 8px; }
+article.card h2 { font-size: 18px; margin-top: 24px; margin-bottom: 8px; }
+article.card h3 { font-size: 15px; margin-top: 16px; margin-bottom: 6px; color: var(--accent); }
+article.card p { margin-bottom: 12px; }
+article.card ul { margin-left: 20px; margin-bottom: 12px; }
+article.card li { margin-bottom: 4px; }
+article.card a { color: var(--accent); }
