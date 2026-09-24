@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FlockWatch Compass — Agentic Detection Platform</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="header">
+    <div class="header-content">
+      <div class="logo">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="2"/>
+          <circle cx="16" cy="16" r="6" stroke="currentColor" stroke-width="2"/>
+          <circle cx="16" cy="16" r="2" fill="currentColor"/>
+          <line x1="16" y1="0" x2="16" y2="6" stroke="currentColor" stroke-width="2"/>
+          <line x1="16" y1="26" x2="16" y2="32" stroke="currentColor" stroke-width="2"/>
+          <line x1="0" y1="16" x2="6" y2="16" stroke="currentColor" stroke-width="2"/>
+          <line x1="26" y1="16" x2="32" y2="16" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        <div>
+          <h1>FlockWatch Compass</h1>
+          <p class="tagline">Agentic AI detection platform for locating Flock cameras across the US</p>
+        </div>
+      </div>
+      <div class="status-bar">
+        <span id="serverStatus" class="status-pill status-unknown">Checking...</span>
+        <span id="pythonStatus" class="status-pill status-unknown">Python: ...</span>
+        <span id="aiStatus" class="status-pill status-unknown">AI: ...</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="main">
+    <!-- Tab navigation -->
+    <nav class="tabs">
+      <button class="tab active" data-tab="analyze">Agent Analysis</button>
+      <button class="tab" data-tab="ingest">Data Ingestion</button>
+      <button class="tab" data-tab="coverage">US Coverage Map</button>
+      <button class="tab" data-tab="signatures">Signatures</button>
+    </nav>
+
+    <!-- Analyze tab -->
+    <section id="tab-analyze" class="tab-content active">
+      <div class="card">
+        <h2>Agent Analysis</h2>
+        <p class="description">Submit scored observations for agentic analysis. The AI agent will cluster detections, rank leads by confidence, generate evidence chains, and identify coverage gaps across the US.</p>
+
+        <div class="input-group">
+          <label for="observationsInput">Observations JSON (array of observation objects)</label>
+          <textarea id="observationsInput" rows="12" placeholder='[{"id":"...","timestamp":"...","source_type":"wigle","location":{"lat":42.739,"lon":-84.408},"signal":{"rssi_dbm":-65},"device":{"mac":"C4:48:54:11:22:33","oui":"C4:48:54","ssid":"Flock-Cam"},"confidence_overall":0.65}]'></textarea>
+        </div>
+
+        <div class="controls-row">
+          <div class="input-group">
+            <label for="threshold">Confidence Threshold</label>
+            <input type="number" id="threshold" value="0.3" step="0.05" min="0" max="1">
+          </div>
+          <div class="input-group">
+            <label for="maxResults">Max Results</label>
+            <input type="number" id="maxResults" value="50" min="1" max="200">
+          </div>
+          <div class="input-group">
+            <label for="includeGaps">Include Coverage Gaps</label>
+            <input type="checkbox" id="includeGaps" checked>
+          </div>
+          <div class="input-group">
+            <label for="wantNarrative">AI Narrative</label>
+            <input type="checkbox" id="wantNarrative">
+          </div>
+        </div>
+
+        <button id="runAnalysis" class="btn-primary">Run Agent Analysis</button>
+        <button id="loadSample" class="btn-secondary">Load Sample Data</button>
+      </div>
+
+      <div id="analysisResults" class="results-container hidden"></div>
+    </section>
+
+    <!-- Ingest tab -->
+    <section id="tab-ingest" class="tab-content hidden">
+      <div class="card">
+        <h2>Data Ingestion</h2>
+        <p class="description">Ingest detection data from multiple sources. Each source type is parsed by the FlockWatch Python engine and normalized into a unified observation schema.</p>
+
+        <div class="input-group">
+          <label for="ingestType">Source Type</label>
+          <select id="ingestType">
+            <option value="wigle">WiGLE CSV Export</option>
+            <option value="esp32">ESP32 Wi-Fi/BLE Log (JSONL)</option>
+            <option value="flipper">Flipper Zero Log</option>
+            <option value="sdr">SDR I/Q Metadata</option>
+          </select>
+        </div>
+
+        <div class="input-group">
+          <label for="ingestFile">File Path (server-side)</label>
+          <input type="text" id="ingestFile" placeholder="/path/to/data.csv">
+        </div>
+
+        <button id="runIngest" class="btn-primary">Ingest Data</button>
+        <button id="runScore" class="btn-secondary">Score Observations</button>
+      </div>
+
+      <div id="ingestResults" class="results-container hidden"></div>
+    </section>
+
+    <!-- Coverage tab -->
+    <section id="tab-coverage" class="tab-content hidden">
+      <div class="card">
+        <h2>US Coverage Analysis</h2>
+        <p class="description">View the current detection coverage across the United States. The agent analyzes all collected observations and identifies regions with evidence vs. coverage gaps.</p>
+        <button id="loadCoverage" class="btn-primary">Load Coverage Analysis</button>
+      </div>
+      <div id="coverageResults" class="results-container hidden"></div>
+    </section>
+
+    <!-- Signatures tab -->
+    <section id="tab-signatures" class="tab-content hidden">
+      <div class="card">
+        <h2>Signature Database</h2>
+        <p class="description">View loaded detection signatures — OUI prefixes, Wi-Fi SSID patterns, BLE service UUIDs, and RF fingerprint templates.</p>
+        <button id="loadSignatures" class="btn-primary">Load Signatures</button>
+      </div>
+      <div id="signatureResults" class="results-container hidden"></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>FlockWatch Compass — Passive detection only. No active probing, jamming, or device access. All findings require lawful verification.</p>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>

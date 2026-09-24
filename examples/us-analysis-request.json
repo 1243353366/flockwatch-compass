@@ -1,0 +1,52 @@
+{
+  "request": {
+    "analysis_type": "us_flock_camera_location",
+    "scope": "contiguous United States",
+    "data_sources": ["wigle", "esp32_wifi", "esp32_ble", "flipper", "sdr"],
+    "threshold": 0.3,
+    "max_results": 50,
+    "include_coverage_gaps": true,
+    "generate_ai_narrative": true
+  },
+  "description": "Submit all collected observations for agentic analysis. The agent will cluster, rank, and generate evidence chains for suspected Flock camera locations across the US.",
+  "expected_output": {
+    "summary": {
+      "total_observations": "number",
+      "located_observations": "number",
+      "total_clusters": "number",
+      "ranked_leads": "number",
+      "high_confidence": "number",
+      "moderate_confidence": "number",
+      "low_confidence": "number"
+    },
+    "leads": [
+      {
+        "cluster_id": "string",
+        "location": { "lat": "float", "lon": "float" },
+        "confidence_score": "float (0-1)",
+        "confidence_level": "high|moderate|low",
+        "observation_count": "number",
+        "source_types": ["wigle", "esp32_wifi", ...],
+        "evidence_chain": {
+          "evidence": [{ "type": "string", "description": "string", "weight": "float" }],
+          "interpretations": ["string"],
+          "recommendations": ["string"],
+          "actions": [{ "action": "string", "owner": "string", "dependency": "string", "success_criterion": "string" }]
+        },
+        "coverage_gaps": ["string"],
+        "legal_note": "Passive detection only..."
+      }
+    ],
+    "coverage": {
+      "total_grid_cells": "number",
+      "covered_cells": "number",
+      "coverage_percentage": "float",
+      "gaps": [{ "region": "string", "status": "no_data", "note": "string" }],
+      "hotspots": [{ "location": { "lat": "float", "lon": "float" }, "confidence": "float" }]
+    },
+    "narrative": {
+      "narrative": "AI-generated intelligence summary",
+      "generated_by": "ai|deterministic_fallback"
+    }
+  }
+}

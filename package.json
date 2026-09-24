@@ -1,0 +1,22 @@
+{
+  "name": "flockwatch-compass",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Agentic AI platform for locating Flock cameras across the United States",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "check": "node --check src/server.js && node --check src/flock-agent-engine.js && node --check src/ai-narrative.js && node --check src/flockwatch-runner.js",
+    "test": "node --test",
+    "verify": "npm run check && npm test"
+  },
+  "homepage": "https://github.com/1243353366/flockwatch-compass",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/1243353366/flockwatch-compass.git"
+  }
+}
