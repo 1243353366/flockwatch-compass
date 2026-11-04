@@ -140,3 +140,7 @@ Apache License 2.0
 - [flock-finder](https://github.com/simeononsecurity/flock-finder) — WiGLE mapping (inspiration)
 - [flock-detection](https://github.com/zmattmanz/flock-detection) — ESP32-S3 detection (inspiration)
 - [FlipDeFlock](https://github.com/ReconGrunt/FlipDeFlock) — Flipper Zero detector (inspiration)
+
+---
+
+Thanks for reading. More of my work: [github.com/1243353366](https://github.com/1243353366).
